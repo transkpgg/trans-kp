@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id          String   @id @default(cuid())
+  nik         String   @unique
+  full_name   String
+  username    String   @unique
+  password    String
+  phone       String?
+  jabatan     String
+  role        String   @default("karyawan")
+  branch_id   String?
+  branch      Branch?  @relation(fields: [branch_id], references: [id])
+  avatar_url  String?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  attendances  Attendance[]
+  hotel_visits HotelVisit[]
+  etoll_histories EtollHistory[]
+}
+
+model Branch {
+  id            String   @id @default(cuid())
+  name          String
+  address       String?
+  latitude      Float
+  longitude     Float
+  radius_meters Int      @default(100)
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  users      User[]
+  schedules  WorkSchedule[]
+}
+
+model WorkSchedule {
+  id            String   @id @default(cuid())
+  branch_id     String
+  branch        Branch   @relation(fields: [branch_id], references: [id])
+  name          String
+  start_time    String
+  end_time      String
+  days_of_week  String   // JSON array: "[1,2,3,4,5]"
+  is_active     Boolean  @default(true)
+}
+
+model Attendance {
+  id                  String   @id @default(cuid())
+  user_id             String
+  user                User     @relation(fields: [user_id], references: [id])
+  branch_id           String
+  date                String   // "2024-06-01"
+  check_in_time       DateTime?
+  check_in_lat        Float?
+  check_in_lng        Float?
+  check_in_photo_url  String?
+  check_in_accuracy   Float?
+  check_out_time      DateTime?
+  check_out_lat       Float?
+  check_out_lng       Float?
+  check_out_photo_url String?
+  check_out_accuracy  Float?
+  status              String   @default("absent")
+  gps_flag            String?
+  notes               String?
+  created_at          DateTime @default(now())
+}
+
+model HotelVisit {
+  id                   String   @id @default(cuid())
+  user_id              String
+  user                 User     @relation(fields: [user_id], references: [id])
+  hotel_name           String
+  check_in_time        DateTime
+  check_in_lat         Float?
+  check_in_lng         Float?
+  hotel_photo_url      String?
+  selfie_check_in_url  String?
+  check_out_time       DateTime?
+  check_out_lat        Float?
+  check_out_lng        Float?
+  selfie_check_out_url String?
+  duration_minutes     Int?
+  notes                String?
+}
+
+model EtollCard {
+  id              String   @id @default(cuid())
+  card_number     String   @unique
+  name            String
+  balance         Float    @default(0)
+  status          String   @default("available") // available, in_use, lost
+  last_used_at    DateTime?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+  
+  histories       EtollHistory[]
+}
+
+model EtollHistory {
+  id             String    @id @default(cuid())
+  card_id        String
+  card           EtollCard @relation(fields: [card_id], references: [id])
+  user_id        String
+  user           User      @relation(fields: [user_id], references: [id])
+  action         String    // "borrowed", "returned"
+  balance_before Float?
+  balance_after  Float?
+  amount_used    Float?
+  timestamp      DateTime  @default(now())
+  notes          String?
+}
