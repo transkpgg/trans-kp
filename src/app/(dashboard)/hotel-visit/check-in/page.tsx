@@ -43,12 +43,6 @@ export default function HotelCheckInPage() {
   const [gpsData, setGpsData] = useState<GPSData | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsError, setGpsError] = useState<string | null>(null);
-  const [gpsValidation, setGpsValidation] = useState<{
-    accuracy_ok: boolean;
-    mock_detected: boolean;
-    server_time_ok: boolean;
-    overall_valid: boolean;
-  } | null>(null);
 
   // Submission
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -90,7 +84,6 @@ export default function HotelCheckInPage() {
   const startGPS = () => {
     setGpsLoading(true);
     setGpsError(null);
-    setGpsValidation(null);
     setGpsData(null);
 
     if (!navigator.geolocation) {
@@ -105,21 +98,6 @@ export default function HotelCheckInPage() {
         const data: GPSData = { latitude, longitude, accuracy };
         setGpsData(data);
         setGpsLoading(false);
-
-        // Validate GPS data
-        setTimeout(() => {
-          const accuracy_ok = accuracy <= 50; // 50 meter max
-          const mock_detected = false; // Web API doesn't expose mock flag directly
-          const server_time_ok = true;
-          const overall_valid = accuracy_ok && !mock_detected && server_time_ok;
-
-          setGpsValidation({
-            accuracy_ok,
-            mock_detected,
-            server_time_ok,
-            overall_valid,
-          });
-        }, 800);
       },
       (error) => {
         setGpsLoading(false);
@@ -400,24 +378,23 @@ export default function HotelCheckInPage() {
 
       {/* ===== STEP 3: GPS Validation (Real GPS) ===== */}
       {currentStep === "gps" && (
-        <div className="glass-card p-6 space-y-6 fade-in">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-emerald-500/10">
-              <Navigation className="w-6 h-6 text-emerald-400" />
+        <div className="space-y-6">
+          <div className="glass-card p-6 space-y-5 fade-in">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-emerald-500/10">
+                <Navigation className="w-6 h-6 text-emerald-400" />
+              </div>
+              <div>
+                <h2 className="font-bold text-white text-lg">
+                  Validasi Lokasi GPS
+                </h2>
+                <p className="text-xs text-surface-400">
+                  Melacak lokasi asli HP Anda
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="font-bold text-white text-lg">
-                Validasi Lokasi GPS
-              </h2>
-              <p className="text-xs text-surface-400">
-                Melacak lokasi asli HP Anda secara otomatis
-              </p>
-            </div>
-          </div>
 
-          {/* GPS Status */}
-          <div className="space-y-4">
-            {/* GPS Acquisition */}
+            {/* GPS Status */}
             <div
               className={cn(
                 "p-4 rounded-xl border transition-all",
@@ -450,7 +427,6 @@ export default function HotelCheckInPage() {
                 {gpsData && (
                   <CheckCircle2 className="w-5 h-5 text-emerald-400" />
                 )}
-                {gpsError && <X className="w-5 h-5 text-red-400" />}
               </div>
               {gpsLoading && (
                 <div className="space-y-2">
@@ -466,9 +442,7 @@ export default function HotelCheckInPage() {
                 </div>
               )}
               {gpsError && (
-                <div className="mt-2">
-                  <p className="text-xs text-red-400">{gpsError}</p>
-                </div>
+                <p className="text-xs text-red-400 mt-2">{gpsError}</p>
               )}
               {gpsData && (
                 <div className="grid grid-cols-2 gap-3 mt-2">
@@ -541,94 +515,36 @@ export default function HotelCheckInPage() {
                 </p>
               </div>
             )}
-
-            {/* Validation Checklist */}
-            {gpsValidation && (
-              <div className="space-y-2 fade-in">
-                <p className="text-xs text-surface-400 uppercase font-semibold mb-3">
-                  Validasi Keamanan
-                </p>
-                {[
-                  {
-                    label: "Akurasi GPS",
-                    ok: gpsValidation.accuracy_ok,
-                  },
-                  {
-                    label: "Mock Location (Fake GPS)",
-                    ok: !gpsValidation.mock_detected,
-                    invertLabel: true,
-                  },
-                  {
-                    label: "Sinkronisasi Waktu Server",
-                    ok: gpsValidation.server_time_ok,
-                  },
-                ].map((item, i) => (
-                  <div
-                    key={item.label}
-                    className="flex items-center gap-3 p-3 rounded-xl bg-surface-900 border border-surface-800 slide-up"
-                    style={{ animationDelay: `${i * 0.2}s` }}
-                  >
-                    {item.ok ? (
-                      <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                      </div>
-                    ) : (
-                      <div className="w-6 h-6 rounded-full bg-red-500/20 flex items-center justify-center">
-                        <X className="w-4 h-4 text-red-400" />
-                      </div>
-                    )}
-                    <span className="text-sm text-white flex-1">
-                      {item.label}
-                    </span>
-                    <span
-                      className={cn(
-                        "text-xs font-bold",
-                        item.ok ? "text-emerald-400" : "text-red-400"
-                      )}
-                    >
-                      {item.ok
-                        ? item.invertLabel
-                          ? "Tidak Terdeteksi"
-                          : "Valid"
-                        : "Gagal"}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
 
-          {/* Actions */}
-          {(gpsValidation || gpsError) && (
-            <div className="space-y-3 fade-in">
-              {gpsValidation?.overall_valid ? (
-                <button
-                  onClick={finishCheckIn}
-                  disabled={isSubmitting}
-                  className="w-full gradient-brand text-white font-medium py-3.5 rounded-xl flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-brand-500/25 transition-all disabled:opacity-50 group"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      Menyimpan...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="w-5 h-5" />
-                      Konfirmasi Check In
-                    </>
-                  )}
-                </button>
+          {/* Action buttons */}
+          {gpsData && (
+            <button
+              onClick={finishCheckIn}
+              disabled={isSubmitting}
+              className="w-full py-3.5 rounded-xl gradient-brand font-medium text-white hover:shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Menyimpan...
+                </>
               ) : (
-                <button
-                  onClick={startGPS}
-                  className="w-full py-3.5 rounded-xl border border-amber-500/30 text-amber-400 font-medium flex items-center justify-center gap-2 hover:bg-amber-500/10 transition-colors"
-                >
-                  <RefreshCw className="w-5 h-5" />
-                  Coba Lagi
-                </button>
+                <>
+                  <CheckCircle2 className="w-5 h-5" />
+                  Konfirmasi Check In
+                </>
               )}
-            </div>
+            </button>
+          )}
+          {gpsError && (
+            <button
+              onClick={startGPS}
+              className="w-full py-3.5 rounded-xl border border-amber-500/30 text-amber-400 font-medium flex items-center justify-center gap-2 hover:bg-amber-500/10 transition-colors"
+            >
+              <RefreshCw className="w-5 h-5" />
+              Coba Lagi
+            </button>
           )}
         </div>
       )}
