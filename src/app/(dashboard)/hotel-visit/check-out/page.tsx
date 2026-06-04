@@ -278,7 +278,7 @@ function CheckOutContent() {
             />
 
             {!photoPreview ? (
-              <div className="w-full aspect-[3/4] glass-card overflow-hidden relative flex flex-col items-center justify-center gap-6">
+              <div className="w-full aspect-square glass-card overflow-hidden relative flex flex-col items-center justify-center gap-6">
                 <div className="w-28 h-28 rounded-full border-2 border-dashed border-surface-600 flex items-center justify-center">
                   <Camera className="w-12 h-12 text-surface-500" />
                 </div>
@@ -300,7 +300,7 @@ function CheckOutContent() {
               </div>
             ) : (
               <div className="w-full flex flex-col fade-in">
-                <div className="w-full aspect-[3/4] glass-card overflow-hidden relative bg-[#0a0a0a]">
+                <div className="w-full aspect-square glass-card overflow-hidden relative bg-[#0a0a0a]">
                   <img
                     src={photoPreview}
                     alt="Selfie checkout"

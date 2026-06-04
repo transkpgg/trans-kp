@@ -165,7 +165,7 @@ export default function HotelCheckInPage() {
   const currentStepIndex = steps.findIndex((s) => s.key === currentStep);
 
   return (
-    <div className="space-y-6 slide-up max-w-lg mx-auto">
+    <div className="space-y-6 slide-up max-w-lg mx-auto pb-32">
       {/* Header */}
       <div className="flex items-center gap-3">
         <button
@@ -313,7 +313,7 @@ export default function HotelCheckInPage() {
             className="hidden"
           />
 
-          <div className="relative aspect-[3/4] bg-[#0a0a0a]">
+          <div className="relative aspect-square bg-[#0a0a0a]">
             {!photoPreview ? (
               // Show button to open camera
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-6">
