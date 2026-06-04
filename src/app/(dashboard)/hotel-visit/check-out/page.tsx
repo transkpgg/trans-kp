@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, Camera, CheckCircle2, Clock, Building2 } from "lucide-react";
 import useSWR from "swr";
@@ -10,7 +10,7 @@ const fetcher = (url: string) => fetch(url).then(res => res.json());
 
 type Step = "INFO" | "SELFIE" | "SUCCESS";
 
-export default function HotelCheckOutPage() {
+function CheckOutContent() {
   const [step, setStep] = useState<Step>("INFO");
   const [selfiePhoto, setSelfiePhoto] = useState(false);
 
@@ -197,5 +197,13 @@ export default function HotelCheckOutPage() {
 
       </div>
     </div>
+  );
+}
+
+export default function HotelCheckOutPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-white text-center">Loading...</div>}>
+      <CheckOutContent />
+    </Suspense>
   );
 }
