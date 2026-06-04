@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
 import {
@@ -20,9 +20,16 @@ import {
   Keyboard,
   Camera,
   Focus,
+  Edit,
+  Trash2,
+  Download,
+  Upload
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { mockUsers } from "@/lib/mock-data";
+import useSWR from "swr";
+import * as XLSX from "xlsx";
+import { toast } from "sonner";
 
 // E-Toll card status types
 type EtollStatus = "in_use" | "returned" | "lost";
@@ -30,7 +37,8 @@ type EtollStatus = "in_use" | "returned" | "lost";
 interface EtollCard {
   id: string;
   card_number: string;
-  card_name: string;
+  card_name?: string;
+  name?: string;
   balance: number;
   assigned_to?: string;
   assigned_to_name?: string;
@@ -38,7 +46,8 @@ interface EtollCard {
   returned_date?: string;
   status: EtollStatus;
   notes?: string;
-  history: EtollHistory[];
+  history?: EtollHistory[];
+  histories?: any[];
 }
 
 interface EtollHistory {
@@ -139,27 +148,113 @@ const mockEtollCards: EtollCard[] = [
   },
 ];
 
+const fetcher = (url: string) => fetch(url).then(res => res.json());
+
 export default function EtollPage() {
+  const { data: mockEtollCards = [], error, mutate } = useSWR("/api/etoll", fetcher);
+  const { data: usersData = [] } = useSWR("/api/users", fetcher);
+  const realUsers = Array.isArray(usersData) ? usersData : [];
+  
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | EtollStatus>("all");
   const [selectedCard, setSelectedCard] = useState<EtollCard | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [assigningCard, setAssigningCard] = useState<EtollCard | null>(null);
+  
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingCard, setEditingCard] = useState<EtollCard | null>(null);
 
-  const filteredCards = mockEtollCards.filter((card) => {
+  // Assign state
+  const [assignDriverId, setAssignDriverId] = useState("");
+  const [assignNotes, setAssignNotes] = useState("");
+
+  const etollFileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingEtoll, setIsUploadingEtoll] = useState(false);
+
+  const handleReturn = async (id: string) => {
+    if (!confirm("Tandai kartu ini telah dikembalikan?")) return;
+    try {
+      const res = await fetch(`/api/etoll/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "return" })
+      });
+      if(res.ok) mutate();
+      else alert((await res.json()).message);
+    } catch(e) { alert("Terjadi kesalahan"); }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Apakah Anda yakin ingin menghapus kartu E-Toll ini? Data yang terhapus tidak dapat dikembalikan.")) return;
+    try {
+      const res = await fetch(`/api/etoll/${id}`, {
+        method: "DELETE"
+      });
+      if(res.ok) {
+        setSelectedCard(null);
+        mutate();
+      } else {
+        alert((await res.json()).message);
+      }
+    } catch(e) { alert("Terjadi kesalahan"); }
+  };
+
+  const handleTopup = async (id: string) => {
+    const amountStr = prompt("Masukkan jumlah nominal Top Up (tanpa titik, misal: 100000):");
+    if (!amountStr) return;
+    const amount = parseInt(amountStr);
+    if (isNaN(amount) || amount <= 0) return alert("Nominal tidak valid");
+    
+    try {
+      const res = await fetch(`/api/etoll/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "topup", amount })
+      });
+      if(res.ok) mutate();
+      else alert((await res.json()).message);
+    } catch(e) { alert("Terjadi kesalahan"); }
+  };
+
+  const handleAssignSubmit = async () => {
+    if (!assigningCard || !assignDriverId) return alert("Pilih pengemudi terlebih dahulu");
+    try {
+      const res = await fetch(`/api/etoll/${assigningCard.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "assign", user_id: assignDriverId, notes: assignNotes })
+      });
+      if(res.ok) {
+        setIsAssignModalOpen(false);
+        setAssigningCard(null);
+        setAssignDriverId("");
+        setAssignNotes("");
+        mutate();
+      } else {
+        alert((await res.json()).message);
+      }
+    } catch(e) { alert("Terjadi kesalahan"); }
+  };
+
+  const etollData = Array.isArray(mockEtollCards) ? mockEtollCards : [];
+
+  const filteredCards = etollData.filter((card: any) => {
+    const cardName = card.name || card.card_name || "";
+    const activeUser = card.status === "in_use" && card.histories?.[0]?.user?.full_name ? card.histories[0].user.full_name : "";
+    
     const matchSearch =
       card.card_number.toLowerCase().includes(search.toLowerCase()) ||
-      card.card_name.toLowerCase().includes(search.toLowerCase()) ||
-      card.assigned_to_name?.toLowerCase().includes(search.toLowerCase());
+      cardName.toLowerCase().includes(search.toLowerCase()) ||
+      activeUser.toLowerCase().includes(search.toLowerCase());
     const matchStatus = filterStatus === "all" || card.status === filterStatus;
     return matchSearch && matchStatus;
   });
 
-  const totalCards = mockEtollCards.length;
-  const inUseCount = mockEtollCards.filter((c) => c.status === "in_use").length;
-  const returnedCount = mockEtollCards.filter((c) => c.status === "returned").length;
-  const lostCount = mockEtollCards.filter((c) => c.status === "lost").length;
+  const totalCards = etollData.length;
+  const inUseCount = etollData.filter((c: any) => c.status === "in_use").length;
+  const returnedCount = etollData.filter((c: any) => c.status === "returned" || c.status === "available").length;
+  const lostCount = etollData.filter((c: any) => c.status === "lost").length;
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(amount);
@@ -213,6 +308,46 @@ export default function EtollPage() {
     }
   };
 
+  const downloadEtollTemplate = () => {
+    const templateData = [
+      { "Nomor Kartu": "6281 5000 0000 1234", "Nama Kartu": "Mandiri E-Toll #1", "Saldo Awal": 100000 }
+    ];
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    ws['!cols'] = [{ wch: 25 }, { wch: 25 }, { wch: 15 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Template EToll");
+    XLSX.writeFile(wb, "Template_Import_EToll.xlsx");
+    toast.success("Template E-Toll berhasil diunduh!");
+  };
+
+  const handleEtollFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingEtoll(true);
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const res = await fetch("/api/etoll/import", {
+        method: "POST",
+        body: formData
+      });
+      const result = await res.json();
+      if (res.ok) {
+        toast.success(`Berhasil import ${result.imported} kartu E-Toll`, {
+          description: result.skipped > 0 ? `${result.skipped} kartu dilewati (nomor sudah ada)` : undefined
+        });
+        mutate();
+      } else {
+        toast.error(result.message || "Gagal mengimport data E-Toll");
+      }
+    } catch (err) {
+      toast.error("Terjadi kesalahan jaringan");
+    } finally {
+      setIsUploadingEtoll(false);
+      if (etollFileInputRef.current) etollFileInputRef.current.value = "";
+    }
+  };
+
   return (
     <div className="space-y-6 slide-up">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -220,13 +355,27 @@ export default function EtollPage() {
           <h1 className="text-2xl font-bold text-white">Manajemen E-Toll</h1>
           <p className="text-sm text-surface-400 mt-1">Pantau penggunaan dan pengembalian kartu E-Toll pengemudi.</p>
         </div>
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl gradient-brand font-medium text-white hover:shadow-lg hover:shadow-brand-500/25 transition-all"
-        >
-          <Plus className="w-5 h-5" />
-          Tambah Kartu
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={downloadEtollTemplate}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-surface-700 font-medium text-surface-300 hover:bg-surface-800 hover:text-white transition-all text-sm"
+          >
+            <Download className="w-4 h-4" />
+            Template
+          </button>
+          <label className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-500/30 font-medium text-emerald-400 hover:bg-emerald-500/10 transition-all text-sm cursor-pointer ${isUploadingEtoll ? 'opacity-50 pointer-events-none' : ''}`}>
+            <Upload className="w-4 h-4" />
+            {isUploadingEtoll ? "Mengupload..." : "Import Excel"}
+            <input ref={etollFileInputRef} type="file" accept=".xlsx,.xls" onChange={handleEtollFileUpload} className="hidden" />
+          </label>
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl gradient-brand font-medium text-white hover:shadow-lg hover:shadow-brand-500/25 transition-all text-sm"
+          >
+            <Plus className="w-5 h-5" />
+            Tambah Kartu
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -265,7 +414,7 @@ export default function EtollPage() {
 
       {/* Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {filteredCards.map((card) => (
+        {filteredCards.map((card: any) => (
           <div
             key={card.id}
             onClick={() => setSelectedCard(card)}
@@ -282,7 +431,7 @@ export default function EtollPage() {
                 <CreditCard className="w-16 h-16" />
               </div>
               <div className="relative z-10">
-                <p className="text-surface-400 text-xs font-medium mb-1">{card.card_name}</p>
+                <p className="text-surface-400 text-xs font-medium mb-1">{card.name || card.card_name}</p>
                 <p className="text-white text-lg font-mono font-bold tracking-wider">{card.card_number}</p>
                 <div className="flex items-center justify-between mt-4">
                   <div>
@@ -301,24 +450,24 @@ export default function EtollPage() {
 
             {/* Card Body */}
             <div className="p-4 space-y-3 border-t border-surface-800">
-              {card.status === "in_use" && card.assigned_to_name && (
+              {card.status === "in_use" && card.histories?.[0] && (
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-surface-700 flex items-center justify-center text-xs font-bold text-white">
-                    {card.assigned_to_name.substring(0, 2).toUpperCase()}
+                    {card.histories[0].user?.full_name?.substring(0, 2).toUpperCase() || "??"}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-white truncate">{card.assigned_to_name}</p>
+                    <p className="text-sm font-medium text-white truncate">{card.histories[0].user?.full_name}</p>
                     <p className="text-[10px] text-surface-400">
-                      Sejak {card.assigned_date && format(new Date(card.assigned_date), "dd MMM yyyy", { locale: id })}
+                      Sejak {card.histories[0].timestamp && format(new Date(card.histories[0].timestamp), "dd MMM yyyy", { locale: id })}
                     </p>
                   </div>
                 </div>
               )}
-              {card.status === "returned" && (
+              {(card.status === "returned" || card.status === "available") && (
                 <div className="flex items-center gap-2 text-sm text-emerald-400">
                   <CheckCircle2 className="w-4 h-4" />
                   <span>
-                    Dikembalikan {card.returned_date && format(new Date(card.returned_date), "dd MMM yyyy", { locale: id })}
+                    Dikembalikan {card.histories?.[0]?.timestamp && format(new Date(card.histories[0].timestamp), "dd MMM yyyy", { locale: id })}
                   </span>
                 </div>
               )}
@@ -334,7 +483,7 @@ export default function EtollPage() {
 
               {/* Action Buttons */}
               <div className="flex gap-2 pt-2 border-t border-surface-800">
-                {card.status === "returned" && (
+                {(card.status === "returned" || card.status === "available") && (
                   <button
                     onClick={(e) => { e.stopPropagation(); setAssigningCard(card); setIsAssignModalOpen(true); }}
                     className="flex-1 py-2 rounded-lg bg-brand-500/10 text-brand-400 text-xs font-medium hover:bg-brand-500/20 transition-colors border border-brand-500/20"
@@ -344,14 +493,14 @@ export default function EtollPage() {
                 )}
                 {card.status === "in_use" && (
                   <button
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={(e) => { e.stopPropagation(); handleReturn(card.id); }}
                     className="flex-1 py-2 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs font-medium hover:bg-emerald-500/20 transition-colors border border-emerald-500/20"
                   >
                     Tandai Kembali
                   </button>
                 )}
                 <button
-                  onClick={(e) => e.stopPropagation()}
+                  onClick={(e) => { e.stopPropagation(); handleTopup(card.id); }}
                   className="flex-1 py-2 rounded-lg bg-purple-500/10 text-purple-400 text-xs font-medium hover:bg-purple-500/20 transition-colors border border-purple-500/20"
                 >
                   Top Up
@@ -375,12 +524,29 @@ export default function EtollPage() {
           <div className="glass-card w-full max-w-lg overflow-hidden flex flex-col max-h-[85vh]" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 border-b border-surface-700 flex justify-between items-start bg-surface-900/50">
               <div>
-                <h2 className="text-xl font-bold text-white">{selectedCard.card_name}</h2>
+                <h2 className="text-xl font-bold text-white">{selectedCard.name || selectedCard.card_name}</h2>
                 <p className="text-brand-400 font-mono text-sm mt-1">{selectedCard.card_number}</p>
               </div>
-              <button onClick={() => setSelectedCard(null)} className="text-surface-400 hover:text-white bg-surface-800 p-2 rounded-lg">
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => { setEditingCard(selectedCard); setIsEditModalOpen(true); }}
+                  className="text-surface-400 hover:text-brand-400 bg-surface-800 p-2 rounded-lg transition-colors"
+                  title="Edit Kartu"
+                >
+                  <Edit className="w-4 h-4" />
+                </button>
+                <button 
+                  onClick={() => handleDelete(selectedCard.id)}
+                  className="text-surface-400 hover:text-red-400 bg-surface-800 p-2 rounded-lg transition-colors"
+                  title="Hapus Kartu"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+                <div className="w-px h-6 bg-surface-700 mx-1"></div>
+                <button onClick={() => setSelectedCard(null)} className="text-surface-400 hover:text-white bg-surface-800 p-2 rounded-lg">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             <div className="p-6 overflow-y-auto space-y-6">
@@ -396,17 +562,17 @@ export default function EtollPage() {
                 </div>
               </div>
 
-              {selectedCard.assigned_to_name && selectedCard.status === "in_use" && (
+              {selectedCard.status === "in_use" && selectedCard.histories?.[0] && (
                 <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20">
                   <p className="text-xs text-amber-400 uppercase font-semibold mb-2">Sedang Digunakan Oleh</p>
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center font-bold text-amber-400">
-                      {selectedCard.assigned_to_name.substring(0, 2).toUpperCase()}
+                      {selectedCard.histories[0].user?.full_name?.substring(0, 2).toUpperCase() || "??"}
                     </div>
                     <div>
-                      <p className="font-medium text-white">{selectedCard.assigned_to_name}</p>
+                      <p className="font-medium text-white">{selectedCard.histories[0].user?.full_name}</p>
                       <p className="text-xs text-surface-400">
-                        Sejak {selectedCard.assigned_date && format(new Date(selectedCard.assigned_date), "dd MMMM yyyy, HH:mm", { locale: id })}
+                        Sejak {selectedCard.histories[0].timestamp && format(new Date(selectedCard.histories[0].timestamp), "dd MMMM yyyy, HH:mm", { locale: id })}
                       </p>
                     </div>
                   </div>
@@ -419,10 +585,10 @@ export default function EtollPage() {
                   <Clock className="w-4 h-4 text-brand-400" /> Riwayat Kartu
                 </h3>
                 <div className="space-y-0">
-                  {selectedCard.history.map((item, idx) => (
+                  {(selectedCard.histories || []).map((item: any, idx: number) => (
                     <div key={item.id} className="flex gap-3 relative">
                       {/* Timeline line */}
-                      {idx < selectedCard.history.length - 1 && (
+                      {idx < (selectedCard.histories || []).length - 1 && (
                         <div className="absolute left-[15px] top-8 bottom-0 w-px bg-surface-700" />
                       )}
                       {/* Icon */}
@@ -433,7 +599,7 @@ export default function EtollPage() {
                       <div className="pb-5 min-w-0">
                         <p className="text-sm text-white">
                           <span className="text-surface-400">{getHistoryLabel(item.action)}</span>{" "}
-                          <span className="font-medium">{item.user_name}</span>
+                          <span className="font-medium">{item.user?.full_name || item.user_name || "Admin"}</span>
                         </p>
                         {item.amount && (
                           <p className="text-sm font-bold text-purple-400 mt-0.5">+{formatCurrency(item.amount)}</p>
@@ -442,7 +608,7 @@ export default function EtollPage() {
                           <p className="text-xs text-surface-500 italic mt-0.5">{item.notes}</p>
                         )}
                         <p className="text-[10px] text-surface-500 mt-1 font-mono">
-                          {format(new Date(item.date), "dd MMM yyyy, HH:mm", { locale: id })}
+                          {format(new Date(item.timestamp || item.date), "dd MMM yyyy, HH:mm", { locale: id })}
                         </p>
                       </div>
                     </div>
@@ -456,7 +622,7 @@ export default function EtollPage() {
 
       {/* Add Card Modal */}
       {isAddModalOpen && (
-        <AddEtollModal onClose={() => setIsAddModalOpen(false)} />
+        <AddEtollModal onClose={() => { setIsAddModalOpen(false); mutate(); }} />
       )}
 
       {/* Assign Card Modal */}
@@ -466,34 +632,52 @@ export default function EtollPage() {
             <div className="p-6 border-b border-surface-700">
               <h2 className="text-xl font-bold text-white">Pinjamkan Kartu E-Toll</h2>
               <p className="text-sm text-surface-400 mt-1">
-                {assigningCard.card_name} — <span className="font-mono text-brand-400">{assigningCard.card_number}</span>
+                {assigningCard.name || assigningCard.card_name} — <span className="font-mono text-brand-400">{assigningCard.card_number}</span>
               </p>
             </div>
             <div className="p-6 space-y-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-surface-300">Pinjamkan Ke</label>
-                <select className="w-full bg-surface-900 border border-surface-700 text-white rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500">
+                <select 
+                  value={assignDriverId} 
+                  onChange={(e) => setAssignDriverId(e.target.value)}
+                  className="w-full bg-surface-900 border border-surface-700 text-white rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
+                >
                   <option value="">-- Pilih Pengemudi --</option>
-                  {mockUsers.filter(u => u.role === "karyawan" && u.is_active).map(u => (
+                  {realUsers.filter((u: any) => u.role === "karyawan" && u.is_active !== false).map((u: any) => (
                     <option key={u.id} value={u.id}>{u.full_name} ({u.nik})</option>
                   ))}
                 </select>
               </div>
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-surface-300">Catatan / Rute</label>
-                <input type="text" className="w-full bg-surface-900 border border-surface-700 text-white rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500" placeholder="Rute Surabaya - Jakarta" />
+                <input 
+                  type="text" 
+                  value={assignNotes}
+                  onChange={(e) => setAssignNotes(e.target.value)}
+                  className="w-full bg-surface-900 border border-surface-700 text-white rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500" 
+                  placeholder="Rute Surabaya - Jakarta" 
+                />
               </div>
             </div>
             <div className="p-6 border-t border-surface-700 bg-surface-900/50 flex justify-end gap-3">
-              <button onClick={() => { setIsAssignModalOpen(false); setAssigningCard(null); }} className="px-5 py-2.5 rounded-xl border border-surface-700 font-medium text-white hover:bg-surface-800 transition-colors">
+              <button onClick={() => { setIsAssignModalOpen(false); setAssigningCard(null); setAssignDriverId(""); setAssignNotes(""); }} className="px-5 py-2.5 rounded-xl border border-surface-700 font-medium text-white hover:bg-surface-800 transition-colors">
                 Batal
               </button>
-              <button onClick={() => { setIsAssignModalOpen(false); setAssigningCard(null); }} className="px-5 py-2.5 rounded-xl gradient-brand font-medium text-white hover:shadow-lg transition-all">
+              <button onClick={handleAssignSubmit} className="px-5 py-2.5 rounded-xl gradient-brand font-medium text-white hover:shadow-lg transition-all disabled:opacity-50" disabled={!assignDriverId}>
                 Pinjamkan
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Edit Card Modal */}
+      {isEditModalOpen && editingCard && (
+        <EditEtollModal 
+          card={editingCard}
+          onClose={() => { setIsEditModalOpen(false); setEditingCard(null); mutate(); }} 
+        />
       )}
     </div>
   );
@@ -502,19 +686,43 @@ export default function EtollPage() {
 // ---- Add E-Toll Modal Component ----
 function AddEtollModal({ onClose }: { onClose: () => void }) {
   const [inputMode, setInputMode] = useState<"barcode" | "manual">("barcode");
-  const [cardNumber, setCardNumber] = useState("");
+  const [formData, setFormData] = useState({ cardNumber: "", cardName: "", initialBalance: "" });
   const [isScanning, setIsScanning] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const simulateScan = () => {
     setIsScanning(true);
     setScanSuccess(false);
-    // Simulate barcode scanning delay
     setTimeout(() => {
-      setCardNumber("6281 5000 0099 8877");
+      setFormData(prev => ({ ...prev, cardNumber: "6281 5000 0099 8877" }));
       setIsScanning(false);
       setScanSuccess(true);
     }, 2500);
+  };
+
+  const handleSave = async () => {
+    setIsSubmitting(true);
+    try {
+      const res = await fetch("/api/etoll", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          card_number: formData.cardNumber,
+          name: formData.cardName,
+        })
+      });
+      if(res.ok) {
+        onClose();
+        setFormData({ cardNumber: "", cardName: "", initialBalance: "" });
+      } else {
+        const d = await res.json();
+        alert(d.message);
+      }
+    } catch(e) {
+      alert("Gagal menyimpan data");
+    }
+    setIsSubmitting(false);
   };
 
   return (
@@ -535,7 +743,7 @@ function AddEtollModal({ onClose }: { onClose: () => void }) {
         <div className="px-6 pt-5">
           <div className="grid grid-cols-2 gap-2 p-1 bg-surface-900 rounded-xl border border-surface-800">
             <button
-              onClick={() => { setInputMode("barcode"); setCardNumber(""); setScanSuccess(false); }}
+              onClick={() => { setInputMode("barcode"); setFormData(prev => ({...prev, cardNumber: ""})); setScanSuccess(false); }}
               className={cn(
                 "py-2.5 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2",
                 inputMode === "barcode"
@@ -547,7 +755,7 @@ function AddEtollModal({ onClose }: { onClose: () => void }) {
               Scan Barcode
             </button>
             <button
-              onClick={() => { setInputMode("manual"); setCardNumber(""); setScanSuccess(false); setIsScanning(false); }}
+              onClick={() => { setInputMode("manual"); setFormData(prev => ({...prev, cardNumber: ""})); setScanSuccess(false); setIsScanning(false); }}
               className={cn(
                 "py-2.5 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2",
                 inputMode === "manual"
@@ -631,10 +839,10 @@ function AddEtollModal({ onClose }: { onClose: () => void }) {
               )}
 
               {/* Show detected number */}
-              {scanSuccess && cardNumber && (
+              {scanSuccess && formData.cardNumber && (
                 <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
                   <p className="text-xs text-emerald-400 uppercase font-semibold mb-1">Nomor E-Toll Terdeteksi</p>
-                  <p className="text-xl font-mono font-bold text-white tracking-wider">{cardNumber}</p>
+                  <p className="text-xl font-mono font-bold text-white tracking-wider">{formData.cardNumber}</p>
                 </div>
               )}
             </div>
@@ -647,8 +855,8 @@ function AddEtollModal({ onClose }: { onClose: () => void }) {
                 </div>
                 <input
                   type="text"
-                  value={cardNumber}
-                  onChange={(e) => setCardNumber(e.target.value)}
+                  value={formData.cardNumber}
+                  onChange={(e) => setFormData(prev => ({...prev, cardNumber: e.target.value}))}
                   className="w-full bg-surface-900/50 border border-surface-700 text-white rounded-xl pl-10 pr-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all placeholder:text-surface-600 font-mono text-lg tracking-wider"
                   placeholder="6281 5000 0000 0000"
                   autoFocus
@@ -665,12 +873,113 @@ function AddEtollModal({ onClose }: { onClose: () => void }) {
             Batal
           </button>
           <button
-            onClick={onClose}
-            disabled={!cardNumber.trim()}
+            onClick={handleSave}
+            disabled={!formData.cardNumber.trim() || isSubmitting}
             className="px-5 py-2.5 rounded-xl gradient-brand font-medium text-white hover:shadow-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
           >
             <CreditCard className="w-4 h-4" />
             Simpan
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- Edit E-Toll Modal Component ----
+function EditEtollModal({ card, onClose }: { card: any, onClose: () => void }) {
+  const [formData, setFormData] = useState({
+    cardNumber: card.card_number || "",
+    cardName: card.name || card.card_name || "",
+    notes: card.notes || ""
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSave = async () => {
+    if (!formData.cardNumber.trim()) return alert("Nomor kartu wajib diisi");
+    
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(`/api/etoll/${card.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "edit",
+          card_number: formData.cardNumber,
+          card_name: formData.cardName,
+          notes: formData.notes
+        })
+      });
+      
+      if (res.ok) {
+        onClose();
+      } else {
+        const errorData = await res.json();
+        alert(errorData.message || "Gagal menyimpan perubahan");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Terjadi kesalahan jaringan");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm fade-in">
+      <div className="glass-card w-full max-w-md overflow-hidden flex flex-col">
+        <div className="p-6 border-b border-surface-700 flex justify-between items-center bg-surface-900/50">
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            <Edit className="w-5 h-5 text-brand-500" /> Edit Kartu E-Toll
+          </h2>
+          <button onClick={onClose} className="text-surface-400 hover:text-white bg-surface-800 p-2 rounded-lg transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-surface-300">Nomor Kartu E-Toll</label>
+            <input
+              type="text"
+              value={formData.cardNumber}
+              onChange={(e) => setFormData(prev => ({...prev, cardNumber: e.target.value}))}
+              className="w-full bg-surface-900/50 border border-surface-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-brand-500 transition-all font-mono tracking-wider"
+              placeholder="6281 5000 0000 0000"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-surface-300">Nama Kartu (Opsional)</label>
+            <input
+              type="text"
+              value={formData.cardName}
+              onChange={(e) => setFormData(prev => ({...prev, cardName: e.target.value}))}
+              className="w-full bg-surface-900/50 border border-surface-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-brand-500 transition-all"
+              placeholder="Mandiri E-Toll #1"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-surface-300">Catatan (Opsional)</label>
+            <textarea
+              value={formData.notes}
+              onChange={(e) => setFormData(prev => ({...prev, notes: e.target.value}))}
+              className="w-full bg-surface-900/50 border border-surface-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-brand-500 transition-all min-h-[100px] resize-none"
+              placeholder="Kondisi kartu, dll."
+            />
+          </div>
+        </div>
+
+        <div className="p-6 border-t border-surface-700 bg-surface-900/50 flex justify-end gap-3">
+          <button onClick={onClose} className="px-5 py-2.5 rounded-xl border border-surface-700 font-medium text-white hover:bg-surface-800 transition-colors">
+            Batal
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={!formData.cardNumber.trim() || isSubmitting}
+            className="px-5 py-2.5 rounded-xl gradient-brand font-medium text-white hover:shadow-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            <Edit className="w-4 h-4" />
+            {isSubmitting ? "Menyimpan..." : "Simpan Perubahan"}
           </button>
         </div>
       </div>

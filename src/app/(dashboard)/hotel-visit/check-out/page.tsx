@@ -1,9 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, Camera, CheckCircle2, Clock, Building2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import useSWR from "swr";
+import { cn, formatTime, getDurationString } from "@/lib/utils";
+
+const fetcher = (url: string) => fetch(url).then(res => res.json());
 
 type Step = "INFO" | "SELFIE" | "SUCCESS";
 
@@ -11,15 +14,49 @@ export default function HotelCheckOutPage() {
   const [step, setStep] = useState<Step>("INFO");
   const [selfiePhoto, setSelfiePhoto] = useState(false);
 
-  const hotelName = "Hotel Bintang 3 - Luminor";
-  const checkInTime = "21:10 WIB (Kemarin)";
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const id = searchParams?.get("id");
+  const { data: visits } = useSWR("/api/hotel-visits", fetcher);
+  const activeVisit = visits?.find((v: any) => v.id === id);
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [successData, setSuccessData] = useState<any>(null);
+
+  const handleCheckOut = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/hotel-visits/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          check_out_lat: -7.257,
+          check_out_lng: 112.752,
+          selfie_check_out_url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?fit=crop&w=300&h=300"
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSuccessData(data.visit);
+        setStep("SUCCESS");
+      } else {
+        alert("Gagal melakukan check out");
+      }
+    } catch (e) {
+      alert("Terjadi kesalahan");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (!activeVisit && step !== "SUCCESS") return <div className="p-8 text-white text-center">Loading...</div>;
   
   return (
     <div className="flex flex-col h-[calc(100vh-6rem)]">
       <div className="flex items-center gap-3 mb-6">
-        <Link href="/hotel-visit" className="p-2 rounded-full bg-surface-800 text-surface-200 hover:text-white transition-colors">
+        <button onClick={() => router.push("/hotel-visit")} className="p-2 rounded-full bg-surface-800 text-surface-200 hover:text-white transition-colors">
           <ChevronLeft className="w-5 h-5" />
-        </Link>
+        </button>
         <h1 className="text-xl font-bold text-white">Check Out Hotel</h1>
       </div>
 
@@ -62,7 +99,7 @@ export default function HotelCheckOutPage() {
               <div className="w-12 h-12 rounded-xl bg-brand-500/20 flex items-center justify-center mb-4">
                 <Building2 className="w-6 h-6 text-brand-500" />
               </div>
-              <h2 className="text-xl font-bold text-white mb-6">{hotelName}</h2>
+              <h2 className="text-xl font-bold text-white mb-6">{activeVisit.hotel_name}</h2>
               
               <div className="space-y-4">
                 <div className="p-4 rounded-xl bg-surface-900 border border-surface-800 flex justify-between items-center">
@@ -70,12 +107,12 @@ export default function HotelCheckOutPage() {
                     <Clock className="w-5 h-5" />
                     <span className="text-sm font-medium">Waktu Check In</span>
                   </div>
-                  <span className="font-bold text-white text-sm">{checkInTime}</span>
+                  <span className="font-bold text-white text-sm">{formatTime(activeVisit.check_in_time)} WIB</span>
                 </div>
                 
                 <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex justify-between items-center">
-                  <span className="text-sm font-medium text-amber-500">Durasi Menginap</span>
-                  <span className="font-bold text-amber-400">8 Jam 20 Menit</span>
+                  <span className="text-sm font-medium text-amber-500">Waktu Sekarang</span>
+                  <span className="font-bold text-amber-400">{formatTime(new Date().toISOString())} WIB</span>
                 </div>
               </div>
             </div>
@@ -116,7 +153,9 @@ export default function HotelCheckOutPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4 mt-6">
                   <button onClick={() => setSelfiePhoto(false)} className="py-3.5 rounded-xl border border-surface-700 text-white font-medium">Ulangi</button>
-                  <button onClick={() => setStep("SUCCESS")} className="py-3.5 rounded-xl gradient-brand text-white font-medium">Kirim Data</button>
+                  <button onClick={() => handleCheckOut()} disabled={isLoading} className="py-3.5 rounded-xl gradient-brand text-white font-medium">
+                    {isLoading ? "Mengirim..." : "Kirim Data"}
+                  </button>
                 </div>
               </div>
             )}
@@ -136,23 +175,23 @@ export default function HotelCheckOutPage() {
             <div className="glass-card p-6 w-full text-left space-y-4 mb-8">
               <div>
                 <p className="text-xs text-surface-500 uppercase font-semibold">Nama Hotel</p>
-                <p className="font-bold text-white mt-1 text-lg">{hotelName}</p>
+                <p className="font-bold text-white mt-1 text-lg">{successData?.hotel_name}</p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs text-surface-500 uppercase font-semibold">Total Durasi</p>
-                  <p className="font-medium text-emerald-400 mt-1">8 Jam 20 Menit</p>
+                  <p className="font-medium text-emerald-400 mt-1">{successData?.duration_minutes ? getDurationString(successData.duration_minutes) : '-'}</p>
                 </div>
                 <div>
                   <p className="text-xs text-surface-500 uppercase font-semibold">Waktu Selesai</p>
-                  <p className="font-medium text-white mt-1">05:30 WIB</p>
+                  <p className="font-medium text-white mt-1">{successData?.check_out_time ? formatTime(successData.check_out_time) : '-'} WIB</p>
                 </div>
               </div>
             </div>
             
-            <Link href="/hotel-visit" className="w-full py-4 rounded-xl bg-surface-800 text-white font-medium hover:bg-surface-700 transition-colors block text-center">
+            <button onClick={() => router.push("/hotel-visit")} className="w-full py-4 rounded-xl bg-surface-800 text-white font-medium hover:bg-surface-700 transition-colors block text-center">
               Kembali ke Daftar
-            </Link>
+            </button>
           </div>
         )}
 

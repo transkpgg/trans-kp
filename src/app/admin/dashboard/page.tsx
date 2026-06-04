@@ -1,46 +1,83 @@
 "use client";
 
-import { Users, UserCheck, Clock, UserX, AlertTriangle, ArrowUpRight, ArrowDownRight, MoreHorizontal, MapPin } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import { mockDashboardStats, mockWeeklyChartData, mockAttendances } from "@/lib/mock-data";
+import { Users, Building2, CreditCard, Car } from "lucide-react";
 import { formatTime, cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
+import useSWR from "swr";
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
+  PieChart, Pie, Legend
+} from "recharts";
+
+const fetcher = (url: string) => fetch(url).then(res => res.json());
 
 export default function AdminDashboardPage() {
-  const stats = [
-    { 
-      label: "Total Karyawan", 
-      value: mockDashboardStats.total_employees, 
-      icon: Users, 
-      color: "brand",
-      trend: "+2 this month" 
-    },
-    { 
-      label: "Hadir Hari Ini", 
-      value: mockDashboardStats.present_today, 
-      icon: UserCheck, 
-      color: "emerald",
-      trend: "84% kehadiran" 
-    },
-    { 
-      label: "Terlambat", 
-      value: mockDashboardStats.late_today, 
-      icon: Clock, 
-      color: "amber",
-      trend: "-1 dari kemarin" 
-    },
-    { 
-      label: "Tidak Hadir", 
-      value: mockDashboardStats.absent_today, 
-      icon: UserX, 
-      color: "red",
-      trend: "Sakit/Izin/Alpa" 
-    },
+  const { data: usersData } = useSWR("/api/users", fetcher);
+  const { data: hotelData } = useSWR("/api/hotel-visits", fetcher);
+  const { data: etollData } = useSWR("/api/etoll", fetcher);
+
+  const users = Array.isArray(usersData) ? usersData : [];
+  const hotelVisits = Array.isArray(hotelData) ? hotelData : [];
+  const etollCards = Array.isArray(etollData) ? etollData : [];
+
+  const driverCount = users.filter((u: any) => u.role === "karyawan").length;
+  const hotelVisitsThisMonth = hotelVisits.length;
+  const totalCards = etollCards.length;
+  const cardsInUse = etollCards.filter((c: any) => c.status === "in_use").length;
+  const cardsAvailable = etollCards.filter((c: any) => c.status === "available" || c.status === "returned").length;
+  const cardsLost = etollCards.filter((c: any) => c.status === "lost").length;
+
+  // Hotel visit status breakdown
+  const hotelSelesai = hotelVisits.filter((v: any) => v.check_out_time).length;
+  const hotelMenginap = hotelVisits.filter((v: any) => !v.check_out_time).length;
+
+  // E-Toll status chart data
+  const etollChartData = [
+    { name: "Dipakai", value: cardsInUse, color: "#f59e0b" },
+    { name: "Tersedia", value: cardsAvailable, color: "#10b981" },
+    { name: "Hilang", value: cardsLost, color: "#ef4444" },
   ];
 
-  const recentAttendances = mockAttendances.filter(a => a.status !== 'absent').slice(0, 5);
-  const alerts = mockAttendances.filter(a => a.gps_flag === 'suspect').slice(0, 3);
+  // Hotel pie chart data
+  const hotelPieData = [
+    { name: "Selesai", value: hotelSelesai, color: "#10b981" },
+    { name: "Menginap", value: hotelMenginap, color: "#f59e0b" },
+  ];
+
+  // Hotel visits per driver (top 5)
+  const driverVisitMap: Record<string, { name: string; count: number }> = {};
+  hotelVisits.forEach((v: any) => {
+    const name = v.user?.full_name || "Unknown";
+    if (!driverVisitMap[name]) driverVisitMap[name] = { name, count: 0 };
+    driverVisitMap[name].count++;
+  });
+  const topDrivers = Object.values(driverVisitMap)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 6);
+  const driverBarColors = ["#6366f1", "#8b5cf6", "#a78bfa", "#c4b5fd", "#818cf8", "#7c3aed"];
+
+  const stats = [
+    { label: "Total Pengemudi", value: driverCount, icon: Users, color: "brand", trend: "Aktif bulan ini" },
+    { label: "Kunjungan Hotel", value: hotelVisitsThisMonth, icon: Building2, color: "emerald", trend: "Total bulan ini" },
+    { label: "Total Kartu E-Toll", value: totalCards, icon: CreditCard, color: "amber", trend: "Kartu terdaftar" },
+    { label: "E-Toll Dipakai", value: cardsInUse, icon: Car, color: "red", trend: "Sedang dipinjam" },
+  ];
+
+  const recentHotels = [...hotelVisits].sort((a: any, b: any) => new Date(b.check_in_time).getTime() - new Date(a.check_in_time).getTime()).slice(0, 5);
+  const activeEtolls = etollCards.filter((c: any) => c.status === "in_use").slice(0, 5);
+
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-surface-900 border border-surface-700 rounded-xl p-3 shadow-xl">
+          <p className="text-white font-medium text-sm">{label || payload[0].name}</p>
+          <p className="text-brand-400 text-xs mt-1">{payload[0].value} {payload[0].value === 1 ? 'item' : 'item'}</p>
+        </div>
+      );
+    }
+    return null;
+  };
 
   return (
     <div className="space-y-6 slide-up">
@@ -77,7 +114,6 @@ export default function AdminDashboardPage() {
                   <Icon className="w-6 h-6" />
                 </div>
               </div>
-              {/* Background gradient effect on hover */}
               <div className={cn(
                 "absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500 bg-gradient-to-br from-transparent to-current",
                 stat.color === 'brand' && "text-brand-500",
@@ -90,131 +126,188 @@ export default function AdminDashboardPage() {
         })}
       </div>
 
+      {/* Charts Row */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Main Chart */}
-        <div className="xl:col-span-2 glass-card p-6 flex flex-col">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="font-bold text-white text-lg">Statistik Kehadiran Mingguan</h3>
-              <p className="text-sm text-surface-400">7 Hari terakhir untuk semua cabang</p>
-            </div>
-            <button className="p-2 text-surface-400 hover:text-white transition-colors">
-              <MoreHorizontal className="w-5 h-5" />
-            </button>
+        
+        {/* Bar Chart: Kunjungan Hotel per Pengemudi */}
+        <div className="xl:col-span-2 glass-card p-6">
+          <div className="mb-6">
+            <h3 className="font-bold text-white text-lg">Kunjungan Hotel per Pengemudi</h3>
+            <p className="text-sm text-surface-400">Top pengemudi dengan kunjungan terbanyak</p>
           </div>
-          <div className="flex-1 min-h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={mockWeeklyChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <XAxis 
-                  dataKey="day" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fill: '#94a3b8', fontSize: 12 }} 
-                  dy={10}
-                />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fill: '#94a3b8', fontSize: 12 }}
-                />
-                <Tooltip 
-                  cursor={{ fill: '#1e293b', opacity: 0.5 }}
-                  contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '12px' }}
-                />
-                <Bar dataKey="hadir" stackId="a" radius={[0, 0, 4, 4]}>
-                  {mockWeeklyChartData.map((entry, index) => (
-                    <Cell key={`cell-hadir-${index}`} fill="#10b981" />
-                  ))}
-                </Bar>
-                <Bar dataKey="terlambat" stackId="a">
-                  {mockWeeklyChartData.map((entry, index) => (
-                    <Cell key={`cell-telat-${index}`} fill="#f59e0b" />
-                  ))}
-                </Bar>
-                <Bar dataKey="absen" stackId="a" radius={[4, 4, 0, 0]}>
-                  {mockWeeklyChartData.map((entry, index) => (
-                    <Cell key={`cell-absen-${index}`} fill="#ef4444" />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex justify-center gap-6 mt-4">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-emerald-500" />
-              <span className="text-xs text-surface-300">Hadir</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-amber-500" />
-              <span className="text-xs text-surface-300">Terlambat</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-red-500" />
-              <span className="text-xs text-surface-300">Absen</span>
-            </div>
+          <div className="h-[280px] w-full">
+            {topDrivers.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topDrivers} margin={{ top: 10, right: 10, left: -15, bottom: 0 }} barSize={32}>
+                  <XAxis 
+                    dataKey="name" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: '#94a3b8', fontSize: 11 }} 
+                    dy={10}
+                    tickFormatter={(val: string) => val.length > 10 ? val.substring(0, 10) + '…' : val}
+                  />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} allowDecimals={false} />
+                  <Tooltip content={<CustomTooltip />} cursor={{ fill: '#1e293b', opacity: 0.5 }} />
+                  <Bar dataKey="count" radius={[8, 8, 0, 0]} name="Kunjungan">
+                    {topDrivers.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={driverBarColors[index % driverBarColors.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-surface-500 text-sm">Belum ada data kunjungan hotel.</div>
+            )}
           </div>
         </div>
 
+        {/* Pie Charts Column */}
         <div className="space-y-6">
-          {/* Alerts */}
+          {/* Pie: Status Hotel */}
           <div className="glass-card p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-white flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-amber-500" />
-                Peringatan
-              </h3>
-              <span className="bg-red-500/10 text-red-400 text-xs font-bold px-2 py-1 rounded-md">{alerts.length} Baru</span>
-            </div>
-            <div className="space-y-3">
-              {alerts.length > 0 ? alerts.map((alert) => (
-                <div key={`alert-${alert.id}`} className="p-3 bg-surface-900/50 border-l-2 border-l-amber-500 rounded-r-xl border border-y-surface-800 border-r-surface-800 flex gap-3">
-                  <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center shrink-0">
-                    <MapPin className="w-4 h-4 text-amber-500" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-white">{alert.user_name}</p>
-                    <p className="text-xs text-surface-400 mt-0.5">GPS Suspect terdeteksi saat check in dari lokasi tidak wajar.</p>
-                    <p className="text-[10px] text-brand-400 mt-1">{format(new Date(alert.date), "dd MMM", { locale: id })} - {alert.check_in_time && formatTime(alert.check_in_time)}</p>
-                  </div>
-                </div>
-              )) : (
-                <p className="text-sm text-surface-400 text-center py-4">Tidak ada peringatan keamanan saat ini.</p>
+            <h3 className="font-bold text-white mb-1">Status Kunjungan Hotel</h3>
+            <p className="text-xs text-surface-400 mb-4">Selesai vs Masih Menginap</p>
+            <div className="h-[160px] w-full">
+              {hotelVisitsThisMonth > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={hotelPieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={40}
+                      outerRadius={65}
+                      paddingAngle={4}
+                      dataKey="value"
+                      strokeWidth={0}
+                    >
+                      {hotelPieData.map((entry, index) => (
+                        <Cell key={`pie-hotel-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend
+                      formatter={(value: string) => <span className="text-xs text-surface-300">{value}</span>}
+                      iconType="circle"
+                      iconSize={8}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-surface-500 text-sm">Belum ada data.</div>
               )}
             </div>
           </div>
 
-          {/* Recent Activity */}
+          {/* Pie: Status E-Toll */}
           <div className="glass-card p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-white">Aktivitas Terbaru</h3>
+            <h3 className="font-bold text-white mb-1">Status Kartu E-Toll</h3>
+            <p className="text-xs text-surface-400 mb-4">Distribusi status semua kartu</p>
+            <div className="h-[160px] w-full">
+              {totalCards > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={etollChartData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={40}
+                      outerRadius={65}
+                      paddingAngle={4}
+                      dataKey="value"
+                      strokeWidth={0}
+                    >
+                      {etollChartData.map((entry, index) => (
+                        <Cell key={`pie-etoll-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend
+                      formatter={(value: string) => <span className="text-xs text-surface-300">{value}</span>}
+                      iconType="circle"
+                      iconSize={8}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-surface-500 text-sm">Belum ada kartu.</div>
+              )}
             </div>
-            <div className="space-y-4">
-              {recentAttendances.map((record) => (
-                <div key={record.id} className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-surface-800 flex items-center justify-center font-bold text-white border border-surface-700">
-                    {record.user_name?.substring(0, 2).toUpperCase()}
+          </div>
+        </div>
+      </div>
+
+      {/* Activity Tables */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Hotel Visits */}
+        <div className="glass-card p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="font-bold text-white flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-emerald-500" />
+              Kunjungan Hotel Terbaru
+            </h3>
+          </div>
+          <div className="space-y-4">
+            {recentHotels.length > 0 ? recentHotels.map((visit: any) => (
+              <div key={visit.id} className="flex items-center gap-3 p-3 bg-surface-900/50 rounded-xl border border-surface-800">
+                <div className="w-10 h-10 rounded-full bg-surface-800 flex items-center justify-center font-bold text-white border border-surface-700">
+                  {visit.user?.full_name?.substring(0, 2).toUpperCase() || "U"}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-white truncate">{visit.hotel_name}</p>
+                  <p className="text-xs text-surface-400 truncate">{visit.user?.full_name || "Pengemudi"}</p>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs font-bold px-2 py-0.5 rounded-md inline-block mb-1 bg-emerald-500/10 text-emerald-400">
+                    {format(new Date(visit.check_in_time), "dd MMM", { locale: id })}
+                  </div>
+                  <p className="text-xs text-surface-400 font-mono">
+                    {formatTime(visit.check_in_time)}
+                  </p>
+                </div>
+              </div>
+            )) : (
+              <p className="text-sm text-surface-400 text-center py-4">Belum ada kunjungan hotel.</p>
+            )}
+          </div>
+        </div>
+
+        {/* Active E-Toll */}
+        <div className="glass-card p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="font-bold text-white flex items-center gap-2">
+              <Car className="w-5 h-5 text-brand-500" />
+              E-Toll Sedang Dipakai
+            </h3>
+          </div>
+          <div className="space-y-4">
+            {activeEtolls.length > 0 ? activeEtolls.map((card: any) => {
+              const activeHistory = card.histories?.[0];
+              const userName = activeHistory?.user?.full_name || "Pengemudi";
+              
+              return (
+                <div key={card.id} className="flex items-center gap-3 p-3 bg-surface-900/50 rounded-xl border border-surface-800">
+                  <div className="w-10 h-10 rounded-full bg-brand-500/10 flex items-center justify-center shrink-0">
+                    <CreditCard className="w-5 h-5 text-brand-500" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white truncate">{record.user_name}</p>
-                    <p className="text-xs text-surface-400 truncate">{record.branch_name}</p>
+                    <p className="text-sm font-medium text-white truncate">{card.name || card.card_name}</p>
+                    <p className="text-xs text-surface-400 truncate">Oleh: {userName}</p>
                   </div>
                   <div className="text-right">
-                    <div className={cn(
-                      "text-xs font-bold px-2 py-0.5 rounded-md inline-block mb-1",
-                      record.status === 'present' ? "bg-emerald-500/10 text-emerald-400" :
-                      record.status === 'late' ? "bg-amber-500/10 text-amber-400" :
-                      "bg-blue-500/10 text-blue-400"
-                    )}>
-                      {record.status === 'present' ? 'HADIR' :
-                       record.status === 'late' ? 'TELAT' : 'IZIN'}
+                    <div className="text-xs font-bold px-2 py-0.5 rounded-md inline-block mb-1 bg-amber-500/10 text-amber-400">
+                      IN USE
                     </div>
-                    <p className="text-xs text-surface-400 font-mono">
-                      {record.check_in_time ? formatTime(record.check_in_time) : '-'}
+                    <p className="text-xs text-brand-400 font-mono font-medium">
+                      Rp {(card.balance / 1000).toFixed(0)}k
                     </p>
                   </div>
                 </div>
-              ))}
-            </div>
+              );
+            }) : (
+              <p className="text-sm text-surface-400 text-center py-4">Tidak ada E-Toll yang sedang dipinjam.</p>
+            )}
           </div>
         </div>
       </div>

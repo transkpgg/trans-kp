@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import { toast } from "sonner";
+import useSWR from "swr";
 import { 
   LayoutDashboard, 
   Users, 
@@ -16,6 +18,7 @@ import {
 } from "lucide-react";
 import { cn, getInitials } from "@/lib/utils";
 import { mockCurrentAdmin } from "@/lib/mock-data";
+import { useRouter } from "next/navigation";
 
 const adminNavItems = [
   { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
@@ -31,8 +34,39 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const adminUser = mockCurrentAdmin;
+  const seenNotifications = useRef<Set<string>>(new Set());
+
+  // Poll notifications every 10 seconds
+  const { data: notifications } = useSWR("/api/admin/notifications", 
+    (url: string) => fetch(url).then(r => r.json()),
+    { refreshInterval: 10000 }
+  );
+
+  useEffect(() => {
+    if (!Array.isArray(notifications)) return;
+    notifications.forEach((n: any) => {
+      if (!seenNotifications.current.has(n.id)) {
+        seenNotifications.current.add(n.id);
+        if (n.type === 'hotel') {
+          toast.info(n.message, { description: 'Kunjungan Hotel', duration: 6000 });
+        } else {
+          toast.success(n.message, { description: 'Transaksi E-Toll', duration: 6000 });
+        }
+      }
+    });
+  }, [notifications]);
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      router.push('/login');
+    } catch (e) {
+      console.error('Logout error', e);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-surface-950 flex relative">
@@ -99,12 +133,12 @@ export default function AdminLayout({
         </div>
         
         <div className="p-4 border-t border-surface-800">
-          <Link href="/login" className="flex items-center gap-3 px-4 py-3 rounded-xl text-red-400 hover:bg-red-500/10 transition-colors w-full group">
+          <button onClick={handleLogout} className="flex items-center gap-3 px-4 py-3 rounded-xl text-red-400 hover:bg-red-500/10 transition-colors w-full group">
             <div className="p-1.5 rounded-lg bg-red-500/10 group-hover:bg-red-500/20">
               <LogOut className="w-4 h-4" />
             </div>
             <span className="font-medium text-sm">Keluar</span>
-          </Link>
+          </button>
         </div>
       </aside>
 

@@ -38,7 +38,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    let isPasswordValid = false;
+    
+    // Check if plain text matches first
+    if (password === user.password) {
+      isPasswordValid = true;
+    } else {
+      // Fallback to bcrypt check for old hashed passwords
+      isPasswordValid = await bcrypt.compare(password, user.password);
+    }
 
     if (!isPasswordValid) {
       return NextResponse.json(
@@ -61,7 +69,8 @@ export async function POST(request: Request) {
       .sign(JWT_SECRET);
 
     // Set cookie
-    cookies().set({
+    const cookieStore = await cookies();
+    cookieStore.set({
       name: 'auth_token',
       value: token,
       httpOnly: true,

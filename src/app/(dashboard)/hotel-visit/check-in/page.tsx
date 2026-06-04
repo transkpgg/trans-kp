@@ -90,8 +90,27 @@ export default function HotelCheckInPage() {
     }, 2000);
   };
 
-  const finishCheckIn = () => {
-    setCurrentStep("success");
+  const finishCheckIn = async () => {
+    try {
+      const res = await fetch("/api/hotel-visits", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hotel_name: hotelName,
+          notes: notes,
+          check_in_lat: gpsData?.latitude,
+          check_in_lng: gpsData?.longitude,
+          selfie_check_in_url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?fit=crop&w=300&h=300" // Simulated uploaded image url
+        })
+      });
+      if (res.ok) {
+        setCurrentStep("success");
+      } else {
+        alert("Gagal menyimpan data check-in");
+      }
+    } catch (e) {
+      alert("Terjadi kesalahan sistem");
+    }
   };
 
   const steps = [

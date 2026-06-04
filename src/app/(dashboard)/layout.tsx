@@ -1,14 +1,15 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Home, History, Building2, User } from "lucide-react";
+import { Home, History, Building2, User, LogOut } from "lucide-react";
 import { cn, getGreeting, getInitials } from "@/lib/utils";
-import { mockCurrentUser } from "@/lib/mock-data";
+import useSWR from "swr";
+
+const fetcher = (url: string) => fetch(url).then(res => res.json());
 
 const navItems = [
   { name: "Home", href: "/home", icon: Home },
-  { name: "Riwayat", href: "/history", icon: History },
   { name: "Hotel", href: "/hotel-visit", icon: Building2 },
   { name: "Profil", href: "/profile", icon: User },
 ];
@@ -19,6 +20,18 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { data: meData } = useSWR("/api/auth/me", fetcher);
+  const currentUser = meData?.user || { full_name: "Memuat...", jabatan: "..." };
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      router.push('/login');
+    } catch (e) {
+      console.error('Logout error', e);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-surface-950 flex flex-col md:flex-row relative">
@@ -54,16 +67,22 @@ export default function DashboardLayout({
           })}
         </div>
         
-        <div className="p-4 border-t border-surface-800">
+        <div className="p-4 border-t border-surface-800 space-y-3">
           <div className="flex items-center gap-3 glass-card p-3">
             <div className="w-10 h-10 rounded-full gradient-brand flex items-center justify-center text-sm font-medium text-white shadow-lg">
-              {getInitials(mockCurrentUser.full_name)}
+              {getInitials(currentUser.full_name)}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">{mockCurrentUser.full_name}</p>
-              <p className="text-xs text-surface-400 truncate">{mockCurrentUser.jabatan}</p>
+              <p className="text-sm font-medium text-white truncate">{currentUser.full_name}</p>
+              <p className="text-xs text-surface-400 truncate">{currentUser.jabatan}</p>
             </div>
           </div>
+          <button onClick={handleLogout} className="flex items-center gap-3 px-4 py-3 rounded-xl text-red-400 hover:bg-red-500/10 transition-colors w-full group">
+            <div className="p-1.5 rounded-lg bg-red-500/10 group-hover:bg-red-500/20">
+              <LogOut className="w-4 h-4" />
+            </div>
+            <span className="font-medium text-sm">Keluar</span>
+          </button>
         </div>
       </aside>
 
@@ -74,10 +93,10 @@ export default function DashboardLayout({
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-surface-400">{getGreeting()},</p>
-              <p className="text-sm font-semibold text-white">{mockCurrentUser.full_name}</p>
+              <p className="text-sm font-semibold text-white">{currentUser.full_name}</p>
             </div>
             <div className="w-10 h-10 rounded-full gradient-brand flex items-center justify-center text-sm font-medium text-white shadow-lg shadow-brand-500/20">
-              {getInitials(mockCurrentUser.full_name)}
+              {getInitials(currentUser.full_name)}
             </div>
           </div>
         </header>

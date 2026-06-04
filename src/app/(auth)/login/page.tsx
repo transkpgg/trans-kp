@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Bus, Eye, EyeOff, Lock, User, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+export default function LoginPage() {
   const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");

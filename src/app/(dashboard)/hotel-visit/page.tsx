@@ -4,19 +4,23 @@ import { useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
-import { Building2, Clock, MapPin, ChevronRight, CheckCircle2 } from "lucide-react";
-import { mockHotelVisits, mockCurrentUser } from "@/lib/mock-data";
+import { Building2, Clock, MapPin, ChevronRight, CheckCircle2, ImageIcon, X } from "lucide-react";
+import useSWR from "swr";
 import { formatTime, getDurationString, cn } from "@/lib/utils";
 
-export default function HotelVisitListPage() {
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
-  
-  const visits = mockHotelVisits.filter(v => 
-    v.user_id === mockCurrentUser.id && 
-    new Date(v.check_in_time).getMonth() === selectedMonth
-  ).sort((a, b) => new Date(b.check_in_time).getTime() - new Date(a.check_in_time).getTime());
+const fetcher = (url: string) => fetch(url).then(res => res.json());
 
-  const activeVisit = mockHotelVisits.find(v => v.user_id === mockCurrentUser.id && !v.check_out_time);
+export default function HotelVisitListPage() {
+  const { data: visitsData, error } = useSWR("/api/hotel-visits", fetcher);
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [selectedMap, setSelectedMap] = useState<{lat: number, lng: number, name: string} | null>(null);
+  
+  const visits = (Array.isArray(visitsData) ? visitsData.filter((v: any) => 
+    new Date(v.check_in_time).getMonth() === selectedMonth
+  ) : []).sort((a: any, b: any) => new Date(b.check_in_time).getTime() - new Date(a.check_in_time).getTime());
+
+  const activeVisit = Array.isArray(visitsData) ? visitsData.find((v: any) => !v.check_out_time) : null;
 
   const months = [
     "Januari", "Februari", "Maret", "April", "Mei", "Juni",
@@ -96,7 +100,7 @@ export default function HotelVisitListPage() {
             <p className="text-sm text-surface-400 mt-1">Anda belum melakukan check-in hotel bulan ini.</p>
           </div>
         ) : (
-          visits.map((visit, index) => (
+          visits.map((visit: any, index: number) => (
             <div 
               key={visit.id} 
               className="glass-card overflow-hidden slide-up"
@@ -105,9 +109,7 @@ export default function HotelVisitListPage() {
               <div className="p-4 border-b border-surface-800 bg-surface-900/30 flex justify-between items-start">
                 <div>
                   <h3 className="font-bold text-white text-lg">{visit.hotel_name}</h3>
-                  <p className="text-xs text-surface-400 flex items-center gap-1 mt-1">
-                    <MapPin className="w-3 h-3" /> Koordinat tersimpan
-                  </p>
+                  {visit.notes && <p className="text-xs text-surface-400 mt-1 italic">"{visit.notes}"</p>}
                 </div>
                 {!visit.check_out_time && (
                   <span className="px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider uppercase bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1.5 animate-pulse shrink-0">
@@ -149,19 +151,7 @@ export default function HotelVisitListPage() {
                   </div>
                 </div>
 
-                <div className="flex gap-2 mb-4">
-                  <div className="w-12 h-12 rounded-lg bg-surface-800 border border-surface-700 overflow-hidden relative">
-                    <div className="absolute inset-0 flex items-center justify-center text-[8px] text-surface-500 text-center px-1">Hotel</div>
-                  </div>
-                  <div className="w-12 h-12 rounded-lg bg-surface-800 border border-surface-700 overflow-hidden relative">
-                    <div className="absolute inset-0 flex items-center justify-center text-[8px] text-surface-500 text-center px-1">Selfie IN</div>
-                  </div>
-                  {visit.check_out_time && (
-                    <div className="w-12 h-12 rounded-lg bg-surface-800 border border-surface-700 overflow-hidden relative">
-                      <div className="absolute inset-0 flex items-center justify-center text-[8px] text-surface-500 text-center px-1">Selfie OUT</div>
-                    </div>
-                  )}
-                </div>
+
 
                 {!visit.check_out_time ? (
                   <Link 
@@ -184,6 +174,49 @@ export default function HotelVisitListPage() {
           ))
         )}
       </div>
+
+      {/* Modals */}
+      {selectedPhoto && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm fade-in">
+          <div className="glass-card max-w-md w-full overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-surface-700 flex justify-between items-center">
+              <h2 className="font-bold text-white">Bukti Foto</h2>
+              <button onClick={() => setSelectedPhoto(null)} className="p-1 hover:bg-surface-700 rounded-lg text-surface-400">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 flex justify-center bg-black/50">
+              <img src={selectedPhoto} alt="Foto Bukti" className="rounded-xl max-h-[60vh] object-contain" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedMap && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm fade-in">
+          <div className="glass-card max-w-2xl w-full overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-surface-700 flex justify-between items-center">
+              <div>
+                <h2 className="font-bold text-white">Lokasi Peta</h2>
+                <p className="text-xs text-surface-400 font-mono mt-1">{selectedMap.lat}, {selectedMap.lng}</p>
+              </div>
+              <button onClick={() => setSelectedMap(null)} className="p-1 hover:bg-surface-700 rounded-lg text-surface-400">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="w-full aspect-[4/3] bg-surface-900">
+              <iframe
+                width="100%"
+                height="100%"
+                frameBorder="0"
+                style={{ border: 0 }}
+                src={`https://www.google.com/maps?q=${selectedMap.lat},${selectedMap.lng}&hl=es;z=14&output=embed`}
+                allowFullScreen
+              ></iframe>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
