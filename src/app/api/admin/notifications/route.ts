@@ -3,6 +3,8 @@ import { cookies } from 'next/headers';
 import * as jose from 'jose';
 import prisma from '@/lib/prisma';
 
+export const dynamic = 'force-dynamic';
+
 const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'super-secret-key-trans-kp-2024'
 );
