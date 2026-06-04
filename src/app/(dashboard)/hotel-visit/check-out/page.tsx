@@ -152,7 +152,7 @@ function CheckOutContent() {
     );
 
   return (
-    <div className="flex flex-col h-[calc(100vh-6rem)]">
+    <div className="flex flex-col min-h-[calc(100vh-6rem)] pb-24">
       <div className="flex items-center gap-3 mb-6">
         <button
           onClick={() => router.push("/hotel-visit")}
@@ -259,7 +259,7 @@ function CheckOutContent() {
 
         {/* STEP 2: SELFIE (Real Camera) */}
         {step === "SELFIE" && (
-          <div className="flex flex-col items-center h-full max-h-[600px]">
+          <div className="flex flex-col items-center w-full max-w-lg mx-auto">
             <h2 className="text-xl font-bold text-white mb-2">
               Foto Selfie Check Out
             </h2>
@@ -278,7 +278,7 @@ function CheckOutContent() {
             />
 
             {!photoPreview ? (
-              <div className="w-full flex-1 glass-card overflow-hidden relative flex flex-col items-center justify-center gap-6">
+              <div className="w-full aspect-[3/4] glass-card overflow-hidden relative flex flex-col items-center justify-center gap-6">
                 <div className="w-28 h-28 rounded-full border-2 border-dashed border-surface-600 flex items-center justify-center">
                   <Camera className="w-12 h-12 text-surface-500" />
                 </div>
@@ -299,8 +299,8 @@ function CheckOutContent() {
                 </button>
               </div>
             ) : (
-              <div className="w-full flex-1 flex flex-col fade-in">
-                <div className="w-full flex-1 glass-card overflow-hidden relative">
+              <div className="w-full flex flex-col fade-in">
+                <div className="w-full aspect-[3/4] glass-card overflow-hidden relative bg-[#0a0a0a]">
                   <img
                     src={photoPreview}
                     alt="Selfie checkout"
