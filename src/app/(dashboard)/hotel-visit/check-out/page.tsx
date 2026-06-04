@@ -311,17 +311,17 @@ function CheckOutContent() {
                     Foto Berhasil
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4 mt-6">
+                <div className="fixed bottom-[5.5rem] left-4 right-4 z-50 grid grid-cols-2 gap-3 max-w-lg mx-auto slide-up">
                   <button
                     onClick={retakePhoto}
-                    className="py-3.5 rounded-xl border border-surface-700 text-white font-medium flex items-center justify-center gap-2"
+                    className="py-3.5 rounded-xl bg-surface-900 border border-surface-700 text-white font-medium flex items-center justify-center gap-2 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]"
                   >
                     <RefreshCw className="w-4 h-4" />
                     Ulangi
                   </button>
                   <button
                     onClick={confirmPhotoAndGetGPS}
-                    className="py-3.5 rounded-xl gradient-brand text-white font-medium flex items-center justify-center gap-2"
+                    className="py-3.5 rounded-xl gradient-brand text-white font-medium flex items-center justify-center gap-2 shadow-[0_-10px_40px_rgba(59,130,246,0.3)]"
                   >
                     Lanjutkan
                     <ArrowRight className="w-4 h-4" />

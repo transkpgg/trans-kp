@@ -356,17 +356,17 @@ export default function HotelCheckInPage() {
 
           {/* Action buttons when photo is taken */}
           {photoPreview && (
-            <div className="p-4 grid grid-cols-2 gap-3 bg-surface-900/50">
+            <div className="fixed bottom-[5.5rem] left-4 right-4 z-50 grid grid-cols-2 gap-3 max-w-lg mx-auto slide-up">
               <button
                 onClick={retakePhoto}
-                className="py-3 rounded-xl border border-surface-700 text-white font-medium flex items-center justify-center gap-2 hover:bg-surface-800 transition-colors"
+                className="py-3.5 rounded-xl bg-surface-900 border border-surface-700 text-white font-medium flex items-center justify-center gap-2 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]"
               >
                 <RefreshCw className="w-4 h-4" />
                 Ulangi
               </button>
               <button
                 onClick={confirmPhoto}
-                className="py-3 rounded-xl gradient-brand text-white font-medium flex items-center justify-center gap-2"
+                className="py-3.5 rounded-xl gradient-brand text-white font-medium flex items-center justify-center gap-2 shadow-[0_-10px_40px_rgba(59,130,246,0.3)]"
               >
                 Lanjutkan
                 <ArrowRight className="w-4 h-4" />
