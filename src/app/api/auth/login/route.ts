@@ -76,7 +76,7 @@ export async function POST(request: Request) {
       httpOnly: true,
       path: '/',
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 60 * 60 * 24, // 24 hours
+      // maxAge dihapus agar menjadi session cookie (otomatis logout saat browser ditutup)
     });
 
     // Return safe user object (without password)

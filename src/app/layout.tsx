@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Toaster } from "sonner";
 
@@ -6,6 +6,20 @@ export const metadata: Metadata = {
   title: "Trans KP — Sistem Operasional Pengemudi",
   description: "Aplikasi monitoring hotel driver dan E-Toll Trans KP",
   manifest: "/manifest.ts",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Trans KP",
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
+  themeColor: "#020617",
 };
 
 export default function RootLayout({
@@ -15,7 +29,6 @@ export default function RootLayout({
 }) {
   return (
     <html lang="id">
-      <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
       <body>
         {children}
         <Toaster 

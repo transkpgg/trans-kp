@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     description:
       "Aplikasi absensi karyawan Trans KP dengan GPS, geofencing, dan kamera selfie",
     start_url: "/",
-    display: "standalone",
+    display: "fullscreen",
     background_color: "#020617",
     theme_color: "#3b82f6",
     orientation: "portrait",

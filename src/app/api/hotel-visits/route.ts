@@ -61,6 +61,21 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { hotel_name, notes, check_in_lat, check_in_lng, selfie_check_in_url } = body;
 
+    // Cek apakah masih ada kunjungan aktif (belum check-out)
+    const activeVisit = await prisma.hotelVisit.findFirst({
+      where: {
+        user_id: user.id as string,
+        check_out_time: null
+      }
+    });
+
+    if (activeVisit) {
+      return NextResponse.json(
+        { message: 'Anda harus melakukan Check Out pada kunjungan sebelumnya terlebih dahulu.' },
+        { status: 400 }
+      );
+    }
+
     const newVisit = await prisma.hotelVisit.create({
       data: {
         user_id: user.id as string,

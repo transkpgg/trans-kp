@@ -139,26 +139,54 @@ export default function AdminHotelVisitsPage() {
                 </div>
               </div>
               
-              <div className="flex items-center justify-between pt-4 border-t border-surface-800">
-                <div className="flex gap-2">
-                  {visit.selfie_check_in_url && (
-                    <button 
-                      onClick={() => setSelectedPhoto(visit.selfie_check_in_url)}
-                      className="flex items-center gap-1.5 text-xs font-medium text-surface-300 hover:text-white px-3 py-1.5 rounded-lg bg-surface-800 hover:bg-surface-700 transition-colors border border-surface-700"
-                    >
-                      <ImageIcon className="w-3.5 h-3.5" /> Foto
-                    </button>
-                  )}
-                  {visit.check_in_lat && visit.check_in_lng && (
-                    <button 
-                      onClick={() => setSelectedMap({ lat: visit.check_in_lat, lng: visit.check_in_lng, name: visit.hotel_name })}
-                      className="flex items-center gap-1.5 text-xs font-medium text-surface-300 hover:text-white px-3 py-1.5 rounded-lg bg-surface-800 hover:bg-surface-700 transition-colors border border-surface-700"
-                    >
-                      <MapPin className="w-3.5 h-3.5" /> Peta
-                    </button>
-                  )}
+              <div className="flex flex-col gap-3 pt-4 border-t border-surface-800">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-surface-500 font-medium">Data Check In:</span>
+                  <div className="flex gap-2">
+                    {visit.selfie_check_in_url && (
+                      <button 
+                        onClick={() => setSelectedPhoto(visit.selfie_check_in_url)}
+                        className="flex items-center gap-1.5 text-xs font-medium text-surface-300 hover:text-white px-3 py-1.5 rounded-lg bg-surface-800 hover:bg-surface-700 transition-colors border border-surface-700"
+                      >
+                        <ImageIcon className="w-3.5 h-3.5" /> Foto
+                      </button>
+                    )}
+                    {visit.check_in_lat && visit.check_in_lng && (
+                      <button 
+                        onClick={() => setSelectedMap({ lat: visit.check_in_lat, lng: visit.check_in_lng, name: visit.hotel_name })}
+                        className="flex items-center gap-1.5 text-xs font-medium text-surface-300 hover:text-white px-3 py-1.5 rounded-lg bg-surface-800 hover:bg-surface-700 transition-colors border border-surface-700"
+                      >
+                        <MapPin className="w-3.5 h-3.5" /> Peta
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div>
+
+                {visit.check_out_time && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-surface-500 font-medium">Data Check Out:</span>
+                    <div className="flex gap-2">
+                      {visit.selfie_check_out_url && (
+                        <button 
+                          onClick={() => setSelectedPhoto(visit.selfie_check_out_url)}
+                          className="flex items-center gap-1.5 text-xs font-medium text-surface-300 hover:text-white px-3 py-1.5 rounded-lg bg-surface-800 hover:bg-surface-700 transition-colors border border-surface-700"
+                        >
+                          <ImageIcon className="w-3.5 h-3.5" /> Foto
+                        </button>
+                      )}
+                      {visit.check_out_lat && visit.check_out_lng && (
+                        <button 
+                          onClick={() => setSelectedMap({ lat: visit.check_out_lat, lng: visit.check_out_lng, name: visit.hotel_name })}
+                          className="flex items-center gap-1.5 text-xs font-medium text-surface-300 hover:text-white px-3 py-1.5 rounded-lg bg-surface-800 hover:bg-surface-700 transition-colors border border-surface-700"
+                        >
+                          <MapPin className="w-3.5 h-3.5" /> Peta
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                <div className="flex justify-end pt-2 mt-1 border-t border-surface-800/50">
                   {visit.duration_minutes ? (
                     <p className="text-sm font-bold text-white">
                       Durasi: <span className="text-emerald-400">{getDurationString(visit.duration_minutes)}</span>
