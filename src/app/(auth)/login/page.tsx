@@ -142,7 +142,7 @@ export default function LoginPage() {
 
       <div className="mt-5 pt-4 border-t border-surface-700/50 text-center">
         <p className="text-xs text-surface-500">
-          Versi 1.0.0 &bull; &copy; {new Date().getFullYear()} Trans KP
+          Versi {process.env.APP_VERSION || "1.0.0"} &bull; &copy; {new Date().getFullYear()} Trans KP
         </p>
       </div>
     </div>

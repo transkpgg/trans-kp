@@ -82,7 +82,7 @@ export default function ProfilePage() {
         Keluar
       </button>
 
-      <p className="text-center text-xs text-surface-500 pt-4">App Version 1.0.0</p>
+      <p className="text-center text-xs text-surface-500 pt-4">App Version {process.env.APP_VERSION || "1.0.0"}</p>
     </div>
   );
 }
