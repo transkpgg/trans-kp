@@ -422,8 +422,9 @@ export default function EtollPage() {
   };
 
   return (
-    <div className="space-y-6 slide-up">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <>
+      <div className="space-y-6 slide-up">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Manajemen E-Toll</h1>
           <p className="text-sm text-surface-400 mt-1">Pantau penggunaan dan pengembalian kartu E-Toll pengemudi.</p>
@@ -605,6 +606,8 @@ export default function EtollPage() {
             <p className="text-surface-400">Tidak ada kartu E-Toll yang ditemukan.</p>
           </div>
         )}
+      </div>
+
       </div>
 
       {/* Detail Modal */}
@@ -870,7 +873,7 @@ export default function EtollPage() {
           onClose={() => { setIsEditModalOpen(false); setEditingCard(null); mutate(); }} 
         />
       )}
-    </div>
+    </>
   );
 }
 
