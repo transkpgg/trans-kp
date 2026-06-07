@@ -23,7 +23,8 @@ import {
   Edit,
   Trash2,
   Download,
-  Upload
+  Upload,
+  Nfc
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { mockUsers } from "@/lib/mock-data";
@@ -171,6 +172,45 @@ export default function EtollPage() {
 
   const etollFileInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingEtoll, setIsUploadingEtoll] = useState(false);
+  
+  const [isScanningNFC, setIsScanningNFC] = useState(false);
+
+  const handleNFCScan = async () => {
+    if (!('NDEFReader' in window)) {
+      toast.error("NFC tidak didukung", {
+        description: "Perangkat atau browser ini (seperti iPhone/Safari) belum mendukung fitur Web NFC. Gunakan Chrome di Android."
+      });
+      return;
+    }
+
+    try {
+      setIsScanningNFC(true);
+      // @ts-ignore - NDEFReader is not strictly typed in standard lib yet
+      const ndef = new window.NDEFReader();
+      await ndef.scan();
+      
+      toast.info("NFC Aktif", { description: "Silakan tempelkan kartu E-Toll ke belakang HP Anda." });
+
+      ndef.onreading = (event: any) => {
+        const serialNumber = event.serialNumber; // Usually in format "xx:xx:xx:xx"
+        // Kita bisa menghilangkan titik dua jika format di database tidak memakainya, tapi di sini kita biarkan saja atau sesuai kebutuhan.
+        // Untuk contoh ini, kita set search langsung ke serial number
+        setSearch(serialNumber);
+        toast.success("Kartu terdeteksi!", { description: `S/N: ${serialNumber}` });
+        setIsScanningNFC(false);
+      };
+
+      ndef.onreadingerror = () => {
+        toast.error("Gagal membaca kartu", { description: "Coba tempelkan kembali kartu E-Toll Anda." });
+        setIsScanningNFC(false);
+      };
+
+    } catch (error) {
+      console.error(error);
+      toast.error("NFC dibatalkan atau ditolak", { description: "Pastikan Anda memberikan izin akses NFC jika diminta." });
+      setIsScanningNFC(false);
+    }
+  };
 
   const handleReturn = async (id: string) => {
     if (!confirm("Tandai kartu ini telah dikembalikan?")) return;
@@ -400,15 +440,31 @@ export default function EtollPage() {
 
       {/* Search */}
       <div className="glass-card p-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-500" />
-          <input
-            type="text"
-            placeholder="Cari no. kartu, nama kartu, atau nama pengemudi..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-surface-900 border border-surface-700 text-white rounded-xl focus:outline-none focus:border-brand-500 transition-colors"
-          />
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-500" />
+            <input
+              type="text"
+              placeholder="Cari no. kartu, nama kartu, atau nama pengemudi..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-surface-900 border border-surface-700 text-white rounded-xl focus:outline-none focus:border-brand-500 transition-colors"
+            />
+          </div>
+          <button
+            onClick={handleNFCScan}
+            disabled={isScanningNFC}
+            className={cn(
+              "flex flex-col items-center justify-center gap-0.5 px-4 py-1 rounded-xl border transition-all min-w-[70px]",
+              isScanningNFC 
+                ? "bg-brand-500/20 border-brand-500/50 text-brand-400 animate-pulse" 
+                : "bg-surface-800 border-surface-700 text-surface-400 hover:text-white hover:bg-surface-700 hover:border-surface-600"
+            )}
+            title="Scan kartu E-Toll via NFC"
+          >
+            <Nfc className={cn("w-5 h-5", isScanningNFC && "animate-bounce")} />
+            <span className="text-[10px] font-bold tracking-wider">NFC</span>
+          </button>
         </div>
       </div>
 
