@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bus, Eye, EyeOff, Lock, User, ArrowRight } from "lucide-react";
+import { Eye, EyeOff, Lock, User, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function LoginPage() {
@@ -45,11 +45,10 @@ export default function LoginPage() {
 
   return (
     <div className="glass-card p-8 w-full border-t border-t-white/10 shadow-2xl">
-      <div className="flex flex-col items-center mb-8">
-        <div className="w-16 h-16 rounded-full gradient-brand flex items-center justify-center shadow-lg shadow-brand-500/30 mb-4 pulse-glow">
-          <Bus className="w-8 h-8 text-white" />
-        </div>
-        <h1 className="text-2xl font-bold text-white tracking-tight">Trans KP</h1>
+      <div className="flex flex-col items-center mb-10 mt-4">
+        <h1 className="text-4xl font-black uppercase tracking-[0.2em] text-transparent bg-clip-text bg-gradient-to-br from-white to-surface-400 drop-shadow-sm" style={{ fontFamily: 'Impact, sans-serif' }}>
+          TRANS KP
+        </h1>
       </div>
 
       <form onSubmit={handleLogin} className="space-y-5">
