@@ -37,7 +37,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { action, user_id, notes, amount } = body;
+    const { action, user_id, notes, amount, new_balance } = body;
 
     // We do all updates in a transaction to ensure data integrity
     const result = await prisma.$transaction(async (tx) => {
@@ -49,9 +49,14 @@ export async function PUT(
           throw new Error("Kartu sedang tidak tersedia untuk dipinjamkan");
         }
         
+        let finalBalance = card.balance;
+        if (new_balance !== undefined && new_balance !== null) {
+          finalBalance = Number(new_balance);
+        }
+
         updatedCard = await tx.etollCard.update({
           where: { id },
-          data: { status: "in_use", last_used_at: new Date() }
+          data: { status: "in_use", last_used_at: new Date(), balance: finalBalance }
         });
 
         newHistory = await tx.etollHistory.create({
@@ -59,7 +64,9 @@ export async function PUT(
             card_id: id,
             user_id: user_id,
             action: "assigned",
-            notes: notes || null
+            notes: notes || null,
+            balance_before: card.balance,
+            balance_after: finalBalance,
           }
         });
       } 
@@ -68,17 +75,33 @@ export async function PUT(
           throw new Error("Kartu sedang tidak dipinjam");
         }
 
+        let finalBalance = card.balance;
+        let amountUsed = 0;
+        if (new_balance !== undefined && new_balance !== null) {
+          finalBalance = Number(new_balance);
+          amountUsed = card.balance - finalBalance;
+        }
+
         updatedCard = await tx.etollCard.update({
           where: { id },
-          data: { status: "available" }
+          data: { status: "available", balance: finalBalance }
         });
+
+        const lastAssign = await tx.etollHistory.findFirst({
+           where: { card_id: id, action: "assigned" },
+           orderBy: { timestamp: "desc" }
+        });
+        const returnUserId = lastAssign ? lastAssign.user_id : currentUser.id;
 
         newHistory = await tx.etollHistory.create({
           data: {
             card_id: id,
-            user_id: currentUser.id as string,
+            user_id: returnUserId as string,
             action: "returned",
-            notes: "Dikembalikan ke admin"
+            notes: notes || "Dikembalikan",
+            balance_before: card.balance,
+            balance_after: finalBalance,
+            amount_used: amountUsed > 0 ? amountUsed : 0
           }
         });
       }

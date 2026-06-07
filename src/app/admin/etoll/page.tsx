@@ -169,6 +169,17 @@ export default function EtollPage() {
   // Assign state
   const [assignDriverId, setAssignDriverId] = useState("");
   const [assignNotes, setAssignNotes] = useState("");
+  const [assignBalance, setAssignBalance] = useState("");
+
+  // Return state
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+  const [returningCard, setReturningCard] = useState<EtollCard | null>(null);
+  const [returnBalance, setReturnBalance] = useState("");
+
+  // Top Up state
+  const [isTopupModalOpen, setIsTopupModalOpen] = useState(false);
+  const [topupCard, setTopupCard] = useState<EtollCard | null>(null);
+  const [topupAmount, setTopupAmount] = useState("");
 
   const etollFileInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingEtoll, setIsUploadingEtoll] = useState(false);
@@ -212,17 +223,27 @@ export default function EtollPage() {
     }
   };
 
-  const handleReturn = async (id: string) => {
-    if (!confirm("Tandai kartu ini telah dikembalikan?")) return;
+  const handleReturnSubmit = async () => {
+    if (!returningCard) return;
     try {
-      const res = await fetch(`/api/etoll/${id}`, {
+      const payload: any = { action: "return" };
+      if (returnBalance !== "") payload.new_balance = parseInt(returnBalance);
+
+      const res = await fetch(`/api/etoll/${returningCard.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "return" })
+        body: JSON.stringify(payload)
       });
-      if(res.ok) mutate();
-      else alert((await res.json()).message);
-    } catch(e) { alert("Terjadi kesalahan"); }
+      if(res.ok) {
+        setIsReturnModalOpen(false);
+        setReturningCard(null);
+        setReturnBalance("");
+        mutate();
+        toast.success("Kartu berhasil dikembalikan");
+      } else {
+        toast.error((await res.json()).message);
+      }
+    } catch(e) { toast.error("Terjadi kesalahan"); }
   };
 
   const handleDelete = async (id: string) => {
@@ -234,47 +255,59 @@ export default function EtollPage() {
       if(res.ok) {
         setSelectedCard(null);
         mutate();
+        toast.success("Kartu berhasil dihapus");
       } else {
-        alert((await res.json()).message);
+        toast.error((await res.json()).message);
       }
-    } catch(e) { alert("Terjadi kesalahan"); }
+    } catch(e) { toast.error("Terjadi kesalahan"); }
   };
 
-  const handleTopup = async (id: string) => {
-    const amountStr = prompt("Masukkan jumlah nominal Top Up (tanpa titik, misal: 100000):");
-    if (!amountStr) return;
-    const amount = parseInt(amountStr);
-    if (isNaN(amount) || amount <= 0) return alert("Nominal tidak valid");
+  const handleTopupSubmit = async () => {
+    if (!topupCard || !topupAmount) return;
+    const amount = parseInt(topupAmount);
+    if (isNaN(amount) || amount <= 0) return toast.error("Nominal tidak valid");
     
     try {
-      const res = await fetch(`/api/etoll/${id}`, {
+      const res = await fetch(`/api/etoll/${topupCard.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "topup", amount })
       });
-      if(res.ok) mutate();
-      else alert((await res.json()).message);
-    } catch(e) { alert("Terjadi kesalahan"); }
+      if(res.ok) {
+        setIsTopupModalOpen(false);
+        setTopupCard(null);
+        setTopupAmount("");
+        mutate();
+        toast.success("Top Up berhasil");
+      } else {
+        toast.error((await res.json()).message);
+      }
+    } catch(e) { toast.error("Terjadi kesalahan"); }
   };
 
   const handleAssignSubmit = async () => {
-    if (!assigningCard || !assignDriverId) return alert("Pilih pengemudi terlebih dahulu");
+    if (!assigningCard || !assignDriverId) return toast.error("Pilih pengemudi terlebih dahulu");
     try {
+      const payload: any = { action: "assign", user_id: assignDriverId, notes: assignNotes };
+      if (assignBalance !== "") payload.new_balance = parseInt(assignBalance);
+
       const res = await fetch(`/api/etoll/${assigningCard.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "assign", user_id: assignDriverId, notes: assignNotes })
+        body: JSON.stringify(payload)
       });
       if(res.ok) {
         setIsAssignModalOpen(false);
         setAssigningCard(null);
         setAssignDriverId("");
         setAssignNotes("");
+        setAssignBalance("");
         mutate();
+        toast.success("Kartu berhasil dipinjamkan");
       } else {
-        alert((await res.json()).message);
+        toast.error((await res.json()).message);
       }
-    } catch(e) { alert("Terjadi kesalahan"); }
+    } catch(e) { toast.error("Terjadi kesalahan"); }
   };
 
   const etollData = Array.isArray(mockEtollCards) ? mockEtollCards : [];
@@ -541,7 +574,7 @@ export default function EtollPage() {
               <div className="flex gap-2 pt-2 border-t border-surface-800">
                 {(card.status === "returned" || card.status === "available") && (
                   <button
-                    onClick={(e) => { e.stopPropagation(); setAssigningCard(card); setIsAssignModalOpen(true); }}
+                    onClick={(e) => { e.stopPropagation(); setAssigningCard(card); setAssignBalance(card.balance.toString()); setIsAssignModalOpen(true); }}
                     className="flex-1 py-2 rounded-lg bg-brand-500/10 text-brand-400 text-xs font-medium hover:bg-brand-500/20 transition-colors border border-brand-500/20"
                   >
                     Pinjamkan
@@ -549,14 +582,14 @@ export default function EtollPage() {
                 )}
                 {card.status === "in_use" && (
                   <button
-                    onClick={(e) => { e.stopPropagation(); handleReturn(card.id); }}
+                    onClick={(e) => { e.stopPropagation(); setReturningCard(card); setReturnBalance(card.balance.toString()); setIsReturnModalOpen(true); }}
                     className="flex-1 py-2 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs font-medium hover:bg-emerald-500/20 transition-colors border border-emerald-500/20"
                   >
-                    Tandai Kembali
+                    Kembalikan
                   </button>
                 )}
                 <button
-                  onClick={(e) => { e.stopPropagation(); handleTopup(card.id); }}
+                  onClick={(e) => { e.stopPropagation(); setTopupCard(card); setIsTopupModalOpen(true); }}
                   className="flex-1 py-2 rounded-lg bg-purple-500/10 text-purple-400 text-xs font-medium hover:bg-purple-500/20 transition-colors border border-purple-500/20"
                 >
                   Top Up
@@ -684,9 +717,11 @@ export default function EtollPage() {
       {/* Assign Card Modal */}
       {isAssignModalOpen && assigningCard && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm fade-in">
-          <div className="glass-card w-full max-w-lg overflow-hidden flex flex-col">
+          <div className="glass-card w-full max-w-lg overflow-hidden flex flex-col transform transition-all scale-100 opacity-100 shadow-2xl">
             <div className="p-6 border-b border-surface-700">
-              <h2 className="text-xl font-bold text-white">Pinjamkan Kartu E-Toll</h2>
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <User className="w-5 h-5 text-brand-400" /> Pinjamkan Kartu E-Toll
+              </h2>
               <p className="text-sm text-surface-400 mt-1">
                 {assigningCard.name || assigningCard.card_name} — <span className="font-mono text-brand-400">{assigningCard.card_number}</span>
               </p>
@@ -697,13 +732,23 @@ export default function EtollPage() {
                 <select 
                   value={assignDriverId} 
                   onChange={(e) => setAssignDriverId(e.target.value)}
-                  className="w-full bg-surface-900 border border-surface-700 text-white rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
+                  className="w-full bg-surface-900 border border-surface-700 text-white rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 transition-colors"
                 >
                   <option value="">-- Pilih Pengemudi --</option>
-                  {realUsers.filter((u: any) => u.role === "karyawan" && u.is_active !== false).map((u: any) => (
+                  {realUsers.filter((u: any) => u.is_active !== false && u.role !== 'super_admin').map((u: any) => (
                     <option key={u.id} value={u.id}>{u.full_name} ({u.nik})</option>
                   ))}
                 </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-surface-300">Saldo Saat Dipinjamkan (Rp)</label>
+                <input 
+                  type="number" 
+                  value={assignBalance}
+                  onChange={(e) => setAssignBalance(e.target.value)}
+                  className="w-full bg-surface-900 border border-surface-700 text-white rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 transition-colors" 
+                  placeholder="Contoh: 100000" 
+                />
               </div>
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-surface-300">Catatan / Rute</label>
@@ -711,17 +756,107 @@ export default function EtollPage() {
                   type="text" 
                   value={assignNotes}
                   onChange={(e) => setAssignNotes(e.target.value)}
-                  className="w-full bg-surface-900 border border-surface-700 text-white rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500" 
+                  className="w-full bg-surface-900 border border-surface-700 text-white rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 transition-colors" 
                   placeholder="Rute Surabaya - Jakarta" 
                 />
               </div>
             </div>
             <div className="p-6 border-t border-surface-700 bg-surface-900/50 flex justify-end gap-3">
-              <button onClick={() => { setIsAssignModalOpen(false); setAssigningCard(null); setAssignDriverId(""); setAssignNotes(""); }} className="px-5 py-2.5 rounded-xl border border-surface-700 font-medium text-white hover:bg-surface-800 transition-colors">
+              <button onClick={() => { setIsAssignModalOpen(false); setAssigningCard(null); setAssignDriverId(""); setAssignNotes(""); setAssignBalance(""); }} className="px-5 py-2.5 rounded-xl border border-surface-700 font-medium text-white hover:bg-surface-800 transition-colors">
                 Batal
               </button>
-              <button onClick={handleAssignSubmit} className="px-5 py-2.5 rounded-xl gradient-brand font-medium text-white hover:shadow-lg transition-all disabled:opacity-50" disabled={!assignDriverId}>
+              <button onClick={handleAssignSubmit} className="px-5 py-2.5 rounded-xl gradient-brand font-medium text-white hover:shadow-lg hover:shadow-brand-500/25 transition-all disabled:opacity-50" disabled={!assignDriverId}>
                 Pinjamkan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Return Card Modal */}
+      {isReturnModalOpen && returningCard && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm fade-in">
+          <div className="glass-card w-full max-w-lg overflow-hidden flex flex-col transform transition-all scale-100 opacity-100 shadow-2xl">
+            <div className="p-6 border-b border-surface-700">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400" /> Kembalikan Kartu E-Toll
+              </h2>
+              <p className="text-sm text-surface-400 mt-1">
+                Konfirmasi pengembalian kartu {returningCard.name || returningCard.card_name}
+              </p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20 mb-4">
+                <p className="text-sm text-emerald-400 mb-1">Kartu saat ini digunakan oleh:</p>
+                <p className="font-bold text-white">{returningCard.histories?.[0]?.user?.full_name || "Pengemudi"}</p>
+              </div>
+              
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-surface-300">Sisa Saldo Saat Dikembalikan (Rp)</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span className="text-surface-500 text-sm font-medium">Rp</span>
+                  </div>
+                  <input 
+                    type="number" 
+                    value={returnBalance}
+                    onChange={(e) => setReturnBalance(e.target.value)}
+                    className="w-full bg-surface-900 border border-surface-700 text-white rounded-xl pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:border-emerald-500 transition-colors" 
+                    placeholder="Sisa saldo..." 
+                  />
+                </div>
+                <p className="text-[10px] text-surface-500">Saldo sebelumnya: {formatCurrency(returningCard.balance)}</p>
+              </div>
+            </div>
+            <div className="p-6 border-t border-surface-700 bg-surface-900/50 flex justify-end gap-3">
+              <button onClick={() => { setIsReturnModalOpen(false); setReturningCard(null); setReturnBalance(""); }} className="px-5 py-2.5 rounded-xl border border-surface-700 font-medium text-white hover:bg-surface-800 transition-colors">
+                Batal
+              </button>
+              <button onClick={handleReturnSubmit} className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 font-medium text-white hover:shadow-lg hover:shadow-emerald-500/25 transition-all">
+                Konfirmasi Kembali
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Top Up Modal */}
+      {isTopupModalOpen && topupCard && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm fade-in">
+          <div className="glass-card w-full max-w-sm overflow-hidden flex flex-col transform transition-all scale-100 opacity-100 shadow-2xl">
+            <div className="p-6 border-b border-surface-700">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <CreditCard className="w-5 h-5 text-purple-400" /> Top Up Saldo
+              </h2>
+              <p className="text-sm text-surface-400 mt-1">
+                {topupCard.name || topupCard.card_name}
+              </p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-surface-300">Nominal Top Up (Rp)</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span className="text-surface-500 text-sm font-medium">Rp</span>
+                  </div>
+                  <input 
+                    type="number" 
+                    value={topupAmount}
+                    onChange={(e) => setTopupAmount(e.target.value)}
+                    className="w-full bg-surface-900 border border-surface-700 text-white rounded-xl pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition-colors" 
+                    placeholder="Contoh: 50000" 
+                    autoFocus
+                  />
+                </div>
+                <p className="text-[10px] text-surface-500">Saldo saat ini: {formatCurrency(topupCard.balance)}</p>
+              </div>
+            </div>
+            <div className="p-6 border-t border-surface-700 bg-surface-900/50 flex justify-end gap-3">
+              <button onClick={() => { setIsTopupModalOpen(false); setTopupCard(null); setTopupAmount(""); }} className="px-5 py-2.5 rounded-xl border border-surface-700 font-medium text-white hover:bg-surface-800 transition-colors">
+                Batal
+              </button>
+              <button onClick={handleTopupSubmit} className="px-5 py-2.5 rounded-xl bg-purple-500 hover:bg-purple-600 font-medium text-white hover:shadow-lg hover:shadow-purple-500/25 transition-all disabled:opacity-50" disabled={!topupAmount}>
+                Top Up
               </button>
             </div>
           </div>
