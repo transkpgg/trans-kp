@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (user.role !== 'admin') {
+    if (user.role === 'karyawan') {
       return NextResponse.json(
         { message: 'Forbidden: Admin access required' },
         { status: 403 }
