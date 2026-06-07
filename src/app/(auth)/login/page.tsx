@@ -45,10 +45,8 @@ export default function LoginPage() {
 
   return (
     <div className="glass-card p-8 w-full border-t border-t-white/10 shadow-2xl">
-      <div className="flex flex-col items-center mb-10 mt-4">
-        <h1 className="text-4xl font-black uppercase tracking-[0.2em] text-transparent bg-clip-text bg-gradient-to-br from-white to-surface-400 drop-shadow-sm" style={{ fontFamily: 'Impact, sans-serif' }}>
-          TRANS KP
-        </h1>
+      <div className="flex flex-col items-center mb-8 mt-4">
+        <h1 className="text-2xl font-bold text-white tracking-tight">Trans KP</h1>
       </div>
 
       <form onSubmit={handleLogin} className="space-y-5">
