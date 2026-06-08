@@ -251,9 +251,22 @@ export default function EtollPage() {
         stopNFCScan();
       }, { signal: abortController.signal });
 
-      ndef.addEventListener("readingerror", () => {
-        toast.error("Gagal membaca kartu", { description: "Coba tempelkan kembali kartu E-Toll Anda." });
-        // Don't stop scanning on read error, let user retry
+      ndef.addEventListener("readingerror", (event: any) => {
+        // E-Toll cards use MIFARE format (not NDEF), so readingerror is expected.
+        // Some Android Chrome implementations still provide serialNumber in the event.
+        const serialNumber = event?.serialNumber;
+        if (serialNumber) {
+          setSearch(serialNumber);
+          toast.success("Kartu terdeteksi!", { description: `S/N: ${serialNumber}` });
+          stopNFCScan();
+        } else {
+          // Card was physically detected (phone vibrated) but Web NFC can't read NDEF data.
+          // This is normal for E-Toll cards (MIFARE DESFire/Classic).
+          toast.info("Kartu terdeteksi", { 
+            description: "Format kartu tidak didukung Web NFC. Silakan masukkan nomor kartu secara manual." 
+          });
+          stopNFCScan();
+        }
       }, { signal: abortController.signal });
 
       // Auto-stop after 30 seconds to avoid indefinite scanning
