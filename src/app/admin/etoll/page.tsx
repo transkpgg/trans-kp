@@ -188,6 +188,8 @@ export default function EtollPage() {
   const [isUploadingEtoll, setIsUploadingEtoll] = useState(false);
   
   const [isScanningNFC, setIsScanningNFC] = useState(false);
+  const [nfcMode, setNfcMode] = useState<"search" | "register">("search");
+  const [nfcRegisterCardId, setNfcRegisterCardId] = useState<string | null>(null);
   const nfcReaderRef = useRef<any>(null);
   const nfcAbortControllerRef = useRef<AbortController | null>(null);
   const nfcTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -204,6 +206,8 @@ export default function EtollPage() {
     }
     nfcReaderRef.current = null;
     setIsScanningNFC(false);
+    setNfcMode("search");
+    setNfcRegisterCardId(null);
   }, []);
 
   // Cleanup on unmount
@@ -213,15 +217,15 @@ export default function EtollPage() {
     };
   }, [stopNFCScan]);
 
-  const handleNFCScan = async () => {
+  // Core NFC scan function that handles both "search" and "register" modes
+  const startNFCScan = async (mode: "search" | "register", cardIdForRegister?: string) => {
     if (!('NDEFReader' in window)) {
       toast.error("NFC tidak didukung", {
-        description: "Perangkat atau browser ini (seperti iPhone/Safari) belum mendukung fitur Web NFC. Gunakan Chrome di Android."
+        description: "Gunakan Chrome di Android untuk fitur NFC."
       });
       return;
     }
 
-    // If already scanning, stop the current scan
     if (isScanningNFC) {
       stopNFCScan();
       toast.info("Scan NFC dihentikan");
@@ -229,68 +233,106 @@ export default function EtollPage() {
     }
 
     try {
-      // Abort any previous scan session
       stopNFCScan();
 
       setIsScanningNFC(true);
+      setNfcMode(mode);
+      if (cardIdForRegister) setNfcRegisterCardId(cardIdForRegister);
 
       const abortController = new AbortController();
       nfcAbortControllerRef.current = abortController;
 
-      // @ts-ignore - NDEFReader is not strictly typed in standard lib yet
+      // @ts-ignore
       const ndef = new window.NDEFReader();
-      nfcReaderRef.current = ndef; // Keep reference to prevent garbage collection
+      nfcReaderRef.current = ndef;
 
       await ndef.scan({ signal: abortController.signal });
-      
-      toast.info("NFC Aktif", { description: "Silakan tempelkan kartu E-Toll ke belakang HP Anda." });
 
-      ndef.addEventListener("reading", ({ serialNumber }: any) => {
-        const sn = serialNumber || "unknown";
-        setSearch(sn);
-        toast.success("Kartu terdeteksi!", { description: `S/N: ${sn}` });
-        stopNFCScan();
-      }, { signal: abortController.signal });
+      toast.info("NFC Aktif", { 
+        description: mode === "register" 
+          ? "Tempelkan kartu E-Toll untuk mendaftarkan NFC-nya." 
+          : "Tempelkan kartu E-Toll untuk mencari datanya." 
+      });
 
-      ndef.addEventListener("readingerror", (event: any) => {
-        // E-Toll/TapCash cards (MIFARE) don't use NDEF, so readingerror is expected.
-        // Some Chrome implementations still provide serialNumber in the event.
-        const serialNumber = event?.serialNumber;
-        if (serialNumber) {
-          setSearch(serialNumber);
-          toast.success("Kartu terdeteksi!", { description: `S/N: ${serialNumber}` });
-        } else {
-          // Card was physically detected (phone vibrated). 
-          // Show positive message and auto-focus search input for manual entry.
-          toast.success("Kartu terdeteksi!", { 
-            description: "Silakan ketik nomor kartu di kolom pencarian." 
-          });
-          // Auto-focus the search input so user can type immediately
-          setTimeout(() => searchInputRef.current?.focus(), 100);
-        }
-        stopNFCScan();
-      }, { signal: abortController.signal });
-
-      // Auto-stop after 30 seconds to avoid indefinite scanning
-      nfcTimeoutRef.current = setTimeout(() => {
-        if (isScanningNFC) {
+      ndef.addEventListener("reading", async ({ serialNumber }: any) => {
+        const sn = serialNumber || "";
+        if (!sn) {
+          toast.error("Tidak dapat membaca Serial Number kartu.");
           stopNFCScan();
-          toast.info("Scan NFC timeout", { description: "Scan otomatis berhenti setelah 30 detik. Silakan coba lagi." });
+          return;
         }
+
+        if (mode === "register" && cardIdForRegister) {
+          // REGISTER MODE: Save NFC UID to the card
+          try {
+            const res = await fetch(`/api/etoll/${cardIdForRegister}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "register_nfc", nfc_uid: sn })
+            });
+            if (res.ok) {
+              toast.success("NFC berhasil didaftarkan!", { description: `UID: ${sn}` });
+              mutate();
+            } else {
+              const data = await res.json();
+              toast.error(data.message || "Gagal mendaftarkan NFC");
+            }
+          } catch (e) {
+            toast.error("Terjadi kesalahan jaringan");
+          }
+          stopNFCScan();
+        } else {
+          // SEARCH MODE: Look up card by NFC UID
+          try {
+            const res = await fetch(`/api/etoll/nfc/${encodeURIComponent(sn)}`);
+            const data = await res.json();
+            if (data.found && data.card) {
+              toast.success("Kartu ditemukan!", { description: `${data.card.name} — ${data.card.card_number}` });
+              setSelectedCard(data.card);
+            } else {
+              // Card not registered with this NFC UID
+              toast.info("NFC belum terdaftar", { 
+                description: `UID: ${sn} — Daftarkan NFC di detail kartu terlebih dahulu.`
+              });
+              setSearch(sn);
+            }
+          } catch (e) {
+            toast.error("Gagal mencari kartu");
+            setSearch(sn);
+          }
+          stopNFCScan();
+        }
+      }, { signal: abortController.signal });
+
+      ndef.addEventListener("readingerror", () => {
+        toast.success("Kartu terdeteksi!", { 
+          description: "Silakan ketik nomor kartu di kolom pencarian." 
+        });
+        setTimeout(() => searchInputRef.current?.focus(), 100);
+        stopNFCScan();
+      }, { signal: abortController.signal });
+
+      // Auto-stop after 30 seconds
+      nfcTimeoutRef.current = setTimeout(() => {
+        stopNFCScan();
+        toast.info("Scan NFC timeout", { description: "Silakan coba lagi." });
       }, 30000);
 
     } catch (error: any) {
       console.error("NFC Scan Error:", error);
-      if (error?.name === 'AbortError') {
-        // Scan was intentionally aborted, no need to show error
-        return;
-      }
+      if (error?.name === 'AbortError') return;
       toast.error("NFC gagal diaktifkan", { 
-        description: error?.message || "Pastikan NFC aktif di pengaturan HP dan berikan izin akses jika diminta." 
+        description: error?.message || "Pastikan NFC aktif di pengaturan HP." 
       });
       stopNFCScan();
     }
   };
+
+  // Search mode NFC scan (used by the NFC button in search bar)
+  const handleNFCScan = () => startNFCScan("search");
+
+  // Register mode NFC scan (used in card detail modal)
+  const handleNFCRegister = (cardId: string) => startNFCScan("register", cardId);
 
   const handleReturnSubmit = async () => {
     if (!returningCard) return;
@@ -390,7 +432,8 @@ export default function EtollPage() {
     const matchSearch =
       card.card_number.toLowerCase().includes(search.toLowerCase()) ||
       cardName.toLowerCase().includes(search.toLowerCase()) ||
-      activeUser.toLowerCase().includes(search.toLowerCase());
+      activeUser.toLowerCase().includes(search.toLowerCase()) ||
+      (card.nfc_uid && card.nfc_uid.toLowerCase().includes(search.toLowerCase()));
     const matchStatus = filterStatus === "all" || card.status === filterStatus;
     return matchSearch && matchStatus;
   });
@@ -722,6 +765,39 @@ export default function EtollPage() {
                 <div className="p-3 rounded-xl bg-surface-900 border border-surface-800">
                   <p className="text-xs text-surface-500 uppercase font-semibold mb-1">Saldo</p>
                   <p className="text-lg font-bold text-white">{formatCurrency(selectedCard.balance)}</p>
+                </div>
+              </div>
+
+              {/* NFC UID Section */}
+              <div className="p-4 rounded-xl bg-surface-900 border border-surface-800">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-surface-500 uppercase font-semibold mb-1 flex items-center gap-1.5">
+                      <Nfc className="w-3.5 h-3.5" /> NFC UID
+                    </p>
+                    {selectedCard.nfc_uid ? (
+                      <p className="text-sm font-mono text-emerald-400">{selectedCard.nfc_uid}</p>
+                    ) : (
+                      <p className="text-sm text-surface-500 italic">Belum didaftarkan</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => handleNFCRegister(selectedCard.id)}
+                    disabled={isScanningNFC}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all",
+                      isScanningNFC && nfcMode === "register"
+                        ? "bg-brand-500/20 text-brand-400 animate-pulse border border-brand-500/30"
+                        : selectedCard.nfc_uid
+                          ? "bg-surface-800 text-surface-400 hover:text-white border border-surface-700"
+                          : "bg-brand-500/10 text-brand-400 hover:bg-brand-500/20 border border-brand-500/20"
+                    )}
+                  >
+                    <Nfc className="w-3.5 h-3.5" />
+                    {isScanningNFC && nfcMode === "register" 
+                      ? "Tempelkan kartu..." 
+                      : selectedCard.nfc_uid ? "Ganti NFC" : "Daftarkan NFC"}
+                  </button>
                 </div>
               </div>
 

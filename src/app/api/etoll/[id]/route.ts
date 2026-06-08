@@ -132,8 +132,25 @@ export async function PUT(
           where: { id },
           data: { 
             card_number: body.card_number !== undefined ? body.card_number : card.card_number,
-            name: body.card_name !== undefined ? body.card_name : card.name
+            name: body.card_name !== undefined ? body.card_name : card.name,
+            nfc_uid: body.nfc_uid !== undefined ? body.nfc_uid : card.nfc_uid
           }
+        });
+      }
+      else if (action === "register_nfc") {
+        if (!body.nfc_uid) {
+          throw new Error("NFC UID tidak boleh kosong");
+        }
+        // Check if this nfc_uid is already used by another card
+        const existingCard = await tx.etollCard.findUnique({
+          where: { nfc_uid: body.nfc_uid }
+        });
+        if (existingCard && existingCard.id !== id) {
+          throw new Error(`NFC UID ini sudah terdaftar pada kartu ${existingCard.name} (${existingCard.card_number})`);
+        }
+        updatedCard = await tx.etollCard.update({
+          where: { id },
+          data: { nfc_uid: body.nfc_uid }
         });
       }
       else {

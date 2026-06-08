@@ -99,6 +99,7 @@ model EtollCard {
   id              String   @id @default(cuid())
   card_number     String   @unique
   name            String
+  nfc_uid         String?  @unique
   balance         Float    @default(0)
   status          String   @default("available") // available, in_use, lost
   last_used_at    DateTime?
