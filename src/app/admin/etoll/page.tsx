@@ -40,6 +40,7 @@ interface EtollCard {
   card_number: string;
   card_name?: string;
   name?: string;
+  nfc_uid?: string;
   balance: number;
   assigned_to?: string;
   assigned_to_name?: string;
