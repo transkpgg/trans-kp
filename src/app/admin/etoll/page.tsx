@@ -168,6 +168,8 @@ export default function EtollPage() {
 
   // Assign state
   const [assignDriverId, setAssignDriverId] = useState("");
+  const [assignDriverSearch, setAssignDriverSearch] = useState("");
+  const [isAssignDriverDropdownOpen, setIsAssignDriverDropdownOpen] = useState(false);
   const [assignNotes, setAssignNotes] = useState("");
   const [assignBalance, setAssignBalance] = useState("");
 
@@ -300,8 +302,10 @@ export default function EtollPage() {
         setIsAssignModalOpen(false);
         setAssigningCard(null);
         setAssignDriverId("");
+        setAssignDriverSearch("");
         setAssignNotes("");
         setAssignBalance("");
+        setIsAssignDriverDropdownOpen(false);
         mutate();
         toast.success("Kartu berhasil dipinjamkan");
       } else {
@@ -575,7 +579,7 @@ export default function EtollPage() {
               <div className="flex gap-2 pt-2 border-t border-surface-800">
                 {(card.status === "returned" || card.status === "available") && (
                   <button
-                    onClick={(e) => { e.stopPropagation(); setAssigningCard(card); setAssignBalance(card.balance.toString()); setIsAssignModalOpen(true); }}
+                    onClick={(e) => { e.stopPropagation(); setAssigningCard(card); setAssignBalance(card.balance.toString()); setAssignDriverSearch(""); setIsAssignDriverDropdownOpen(false); setIsAssignModalOpen(true); }}
                     className="flex-1 py-2 rounded-lg bg-brand-500/10 text-brand-400 text-xs font-medium hover:bg-brand-500/20 transition-colors border border-brand-500/20"
                   >
                     Pinjamkan
@@ -730,18 +734,66 @@ export default function EtollPage() {
               </p>
             </div>
             <div className="p-6 space-y-4">
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 relative">
                 <label className="text-xs font-medium text-surface-300">Pinjamkan Ke</label>
-                <select 
-                  value={assignDriverId} 
-                  onChange={(e) => setAssignDriverId(e.target.value)}
-                  className="w-full bg-surface-900 border border-surface-700 text-white rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 transition-colors"
-                >
-                  <option value="">-- Pilih Pengemudi --</option>
-                  {realUsers.filter((u: any) => u.is_active !== false && u.role !== 'super_admin').map((u: any) => (
-                    <option key={u.id} value={u.id}>{u.full_name} ({u.nik})</option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <div className="flex items-center w-full bg-surface-900 border border-surface-700 rounded-xl overflow-hidden focus-within:border-brand-500 transition-colors">
+                     <Search className="w-4 h-4 text-surface-500 ml-3 shrink-0" />
+                     <input
+                       type="text"
+                       placeholder="Cari pengemudi..."
+                       value={assignDriverSearch}
+                       onChange={(e) => {
+                         setAssignDriverSearch(e.target.value);
+                         setIsAssignDriverDropdownOpen(true);
+                         setAssignDriverId(""); 
+                       }}
+                       onFocus={() => setIsAssignDriverDropdownOpen(true)}
+                       className="w-full bg-transparent text-white px-3 py-2.5 text-sm focus:outline-none"
+                     />
+                     {assignDriverSearch && (
+                       <button 
+                         onClick={() => {
+                           setAssignDriverId("");
+                           setAssignDriverSearch("");
+                           setIsAssignDriverDropdownOpen(true);
+                         }}
+                         className="p-2 text-surface-500 hover:text-white"
+                       >
+                         <X className="w-4 h-4" />
+                       </button>
+                     )}
+                  </div>
+                  
+                  {isAssignDriverDropdownOpen && (
+                    <div className="absolute z-50 w-full mt-1 bg-surface-800 border border-surface-700 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                      {realUsers
+                        .filter((u: any) => u.is_active !== false && u.role !== 'super_admin')
+                        .filter((u: any) => u.full_name.toLowerCase().includes(assignDriverSearch.toLowerCase()) || (u.nik && u.nik.toLowerCase().includes(assignDriverSearch.toLowerCase())))
+                        .map((u: any) => (
+                          <div 
+                            key={u.id} 
+                            onClick={() => {
+                              setAssignDriverId(u.id);
+                              setAssignDriverSearch(`${u.full_name} (${u.nik || '-'})`);
+                              setIsAssignDriverDropdownOpen(false);
+                            }}
+                            className={cn(
+                              "px-3 py-2 text-sm cursor-pointer hover:bg-surface-700 transition-colors text-white",
+                              assignDriverId === u.id && "bg-brand-500/20 text-brand-400"
+                            )}
+                          >
+                            {u.full_name} <span className="text-surface-400 text-xs">({u.nik || '-'})</span>
+                          </div>
+                      ))}
+                      {realUsers.filter((u: any) => u.is_active !== false && u.role !== 'super_admin').filter((u: any) => u.full_name.toLowerCase().includes(assignDriverSearch.toLowerCase()) || (u.nik && u.nik.toLowerCase().includes(assignDriverSearch.toLowerCase()))).length === 0 && (
+                        <div className="px-3 py-3 text-sm text-surface-400 text-center">
+                          Pengemudi tidak ditemukan
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-surface-300">Saldo Saat Dipinjamkan (Rp)</label>
@@ -765,7 +817,7 @@ export default function EtollPage() {
               </div>
             </div>
             <div className="p-6 border-t border-surface-700 bg-surface-900/50 flex justify-end gap-3">
-              <button onClick={() => { setIsAssignModalOpen(false); setAssigningCard(null); setAssignDriverId(""); setAssignNotes(""); setAssignBalance(""); }} className="px-5 py-2.5 rounded-xl border border-surface-700 font-medium text-white hover:bg-surface-800 transition-colors">
+              <button onClick={() => { setIsAssignModalOpen(false); setAssigningCard(null); setAssignDriverId(""); setAssignDriverSearch(""); setIsAssignDriverDropdownOpen(false); setAssignNotes(""); setAssignBalance(""); }} className="px-5 py-2.5 rounded-xl border border-surface-700 font-medium text-white hover:bg-surface-800 transition-colors">
                 Batal
               </button>
               <button onClick={handleAssignSubmit} className="px-5 py-2.5 rounded-xl gradient-brand font-medium text-white hover:shadow-lg hover:shadow-brand-500/25 transition-all disabled:opacity-50" disabled={!assignDriverId}>
