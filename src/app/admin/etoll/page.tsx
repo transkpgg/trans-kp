@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
 import {
@@ -187,6 +187,30 @@ export default function EtollPage() {
   const [isUploadingEtoll, setIsUploadingEtoll] = useState(false);
   
   const [isScanningNFC, setIsScanningNFC] = useState(false);
+  const nfcReaderRef = useRef<any>(null);
+  const nfcAbortControllerRef = useRef<AbortController | null>(null);
+  const nfcTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup NFC scan resources
+  const stopNFCScan = useCallback(() => {
+    if (nfcTimeoutRef.current) {
+      clearTimeout(nfcTimeoutRef.current);
+      nfcTimeoutRef.current = null;
+    }
+    if (nfcAbortControllerRef.current) {
+      nfcAbortControllerRef.current.abort();
+      nfcAbortControllerRef.current = null;
+    }
+    nfcReaderRef.current = null;
+    setIsScanningNFC(false);
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopNFCScan();
+    };
+  }, [stopNFCScan]);
 
   const handleNFCScan = async () => {
     if (!('NDEFReader' in window)) {
@@ -196,32 +220,60 @@ export default function EtollPage() {
       return;
     }
 
+    // If already scanning, stop the current scan
+    if (isScanningNFC) {
+      stopNFCScan();
+      toast.info("Scan NFC dihentikan");
+      return;
+    }
+
     try {
+      // Abort any previous scan session
+      stopNFCScan();
+
       setIsScanningNFC(true);
+
+      const abortController = new AbortController();
+      nfcAbortControllerRef.current = abortController;
+
       // @ts-ignore - NDEFReader is not strictly typed in standard lib yet
       const ndef = new window.NDEFReader();
-      await ndef.scan();
+      nfcReaderRef.current = ndef; // Keep reference to prevent garbage collection
+
+      await ndef.scan({ signal: abortController.signal });
       
       toast.info("NFC Aktif", { description: "Silakan tempelkan kartu E-Toll ke belakang HP Anda." });
 
-      ndef.onreading = (event: any) => {
-        const serialNumber = event.serialNumber; // Usually in format "xx:xx:xx:xx"
-        // Kita bisa menghilangkan titik dua jika format di database tidak memakainya, tapi di sini kita biarkan saja atau sesuai kebutuhan.
-        // Untuk contoh ini, kita set search langsung ke serial number
-        setSearch(serialNumber);
-        toast.success("Kartu terdeteksi!", { description: `S/N: ${serialNumber}` });
-        setIsScanningNFC(false);
-      };
+      ndef.addEventListener("reading", ({ serialNumber }: any) => {
+        const sn = serialNumber || "unknown";
+        setSearch(sn);
+        toast.success("Kartu terdeteksi!", { description: `S/N: ${sn}` });
+        stopNFCScan();
+      }, { signal: abortController.signal });
 
-      ndef.onreadingerror = () => {
+      ndef.addEventListener("readingerror", () => {
         toast.error("Gagal membaca kartu", { description: "Coba tempelkan kembali kartu E-Toll Anda." });
-        setIsScanningNFC(false);
-      };
+        // Don't stop scanning on read error, let user retry
+      }, { signal: abortController.signal });
 
-    } catch (error) {
-      console.error(error);
-      toast.error("NFC dibatalkan atau ditolak", { description: "Pastikan Anda memberikan izin akses NFC jika diminta." });
-      setIsScanningNFC(false);
+      // Auto-stop after 30 seconds to avoid indefinite scanning
+      nfcTimeoutRef.current = setTimeout(() => {
+        if (isScanningNFC) {
+          stopNFCScan();
+          toast.info("Scan NFC timeout", { description: "Scan otomatis berhenti setelah 30 detik. Silakan coba lagi." });
+        }
+      }, 30000);
+
+    } catch (error: any) {
+      console.error("NFC Scan Error:", error);
+      if (error?.name === 'AbortError') {
+        // Scan was intentionally aborted, no need to show error
+        return;
+      }
+      toast.error("NFC gagal diaktifkan", { 
+        description: error?.message || "Pastikan NFC aktif di pengaturan HP dan berikan izin akses jika diminta." 
+      });
+      stopNFCScan();
     }
   };
 
@@ -491,14 +543,13 @@ export default function EtollPage() {
           </div>
           <button
             onClick={handleNFCScan}
-            disabled={isScanningNFC}
             className={cn(
               "flex flex-col items-center justify-center gap-0.5 px-4 py-1 rounded-xl border transition-all min-w-[70px]",
               isScanningNFC 
                 ? "bg-brand-500/20 border-brand-500/50 text-brand-400 animate-pulse" 
                 : "bg-surface-800 border-surface-700 text-surface-400 hover:text-white hover:bg-surface-700 hover:border-surface-600"
             )}
-            title="Scan kartu E-Toll via NFC"
+            title={isScanningNFC ? "Tap untuk berhenti scan" : "Scan kartu E-Toll via NFC"}
           >
             <Nfc className={cn("w-5 h-5", isScanningNFC && "animate-bounce")} />
             <span className="text-[10px] font-bold tracking-wider">NFC</span>
