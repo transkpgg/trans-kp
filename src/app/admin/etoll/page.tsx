@@ -184,6 +184,7 @@ export default function EtollPage() {
   const [topupAmount, setTopupAmount] = useState("");
 
   const etollFileInputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingEtoll, setIsUploadingEtoll] = useState(false);
   
   const [isScanningNFC, setIsScanningNFC] = useState(false);
@@ -252,21 +253,22 @@ export default function EtollPage() {
       }, { signal: abortController.signal });
 
       ndef.addEventListener("readingerror", (event: any) => {
-        // E-Toll cards use MIFARE format (not NDEF), so readingerror is expected.
-        // Some Android Chrome implementations still provide serialNumber in the event.
+        // E-Toll/TapCash cards (MIFARE) don't use NDEF, so readingerror is expected.
+        // Some Chrome implementations still provide serialNumber in the event.
         const serialNumber = event?.serialNumber;
         if (serialNumber) {
           setSearch(serialNumber);
           toast.success("Kartu terdeteksi!", { description: `S/N: ${serialNumber}` });
-          stopNFCScan();
         } else {
-          // Card was physically detected (phone vibrated) but Web NFC can't read NDEF data.
-          // This is normal for E-Toll cards (MIFARE DESFire/Classic).
-          toast.info("Kartu terdeteksi", { 
-            description: "Format kartu tidak didukung Web NFC. Silakan masukkan nomor kartu secara manual." 
+          // Card was physically detected (phone vibrated). 
+          // Show positive message and auto-focus search input for manual entry.
+          toast.success("Kartu terdeteksi!", { 
+            description: "Silakan ketik nomor kartu di kolom pencarian." 
           });
-          stopNFCScan();
+          // Auto-focus the search input so user can type immediately
+          setTimeout(() => searchInputRef.current?.focus(), 100);
         }
+        stopNFCScan();
       }, { signal: abortController.signal });
 
       // Auto-stop after 30 seconds to avoid indefinite scanning
@@ -547,6 +549,7 @@ export default function EtollPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-500" />
             <input
+              ref={searchInputRef}
               type="text"
               placeholder="Cari no. kartu, nama kartu, atau nama pengemudi..."
               value={search}
