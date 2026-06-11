@@ -628,16 +628,16 @@ export default function EtollPage() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    transition={{ duration: 0.15 }}
+                    transition={{ duration: 0.1 }}
                     className="fixed inset-0 z-40" 
                     onClick={() => setIsFilterDropdownOpen(false)} 
                   />
                   <motion.div 
-                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    transition={{ duration: 0.15, ease: "easeOut" }}
-                    className="absolute z-50 w-full bottom-full mb-2 py-1.5 bg-surface-800 border border-surface-700 rounded-xl shadow-2xl overflow-hidden origin-bottom"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.1 }}
+                    className="absolute z-50 w-full bottom-full mb-2 py-1.5 bg-surface-800 border border-surface-700 rounded-xl shadow-lg overflow-hidden"
                   >
                     {[
                       { value: "all", label: "Semua Status" },
@@ -649,12 +649,12 @@ export default function EtollPage() {
                         key={option.value}
                         onClick={() => { setFilterStatus(option.value as any); setIsFilterDropdownOpen(false); }}
                         className={cn(
-                          "w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center gap-2 relative overflow-hidden group",
+                          "w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 relative",
                           filterStatus === option.value ? "text-brand-400 font-medium bg-brand-500/10" : "text-surface-300 hover:text-white hover:bg-surface-700/50"
                         )}
                       >
                         {filterStatus === option.value && (
-                          <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-brand-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]" />
+                          <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-brand-500" />
                         )}
                         <div className={cn("w-1.5 h-1.5 rounded-full", filterStatus === option.value ? "bg-brand-500" : "bg-transparent")} />
                         <span>{option.label}</span>
