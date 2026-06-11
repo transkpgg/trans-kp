@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
 import {
@@ -620,10 +621,24 @@ export default function EtollPage() {
                 </svg>
               </button>
               
+              <AnimatePresence>
               {isFilterDropdownOpen && (
                 <>
-                  <div className="fixed inset-0 z-40" onClick={() => setIsFilterDropdownOpen(false)} />
-                  <div className="absolute z-50 w-full bottom-full mb-2 py-1.5 bg-surface-800 border border-surface-700 rounded-xl shadow-2xl overflow-hidden">
+                  <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="fixed inset-0 z-40" 
+                    onClick={() => setIsFilterDropdownOpen(false)} 
+                  />
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    transition={{ duration: 0.15, ease: "easeOut" }}
+                    className="absolute z-50 w-full bottom-full mb-2 py-1.5 bg-surface-800 border border-surface-700 rounded-xl shadow-2xl overflow-hidden origin-bottom"
+                  >
                     {[
                       { value: "all", label: "Semua Status" },
                       { value: "in_use", label: "Di Pinjam" },
@@ -634,7 +649,7 @@ export default function EtollPage() {
                         key={option.value}
                         onClick={() => { setFilterStatus(option.value as any); setIsFilterDropdownOpen(false); }}
                         className={cn(
-                          "w-full text-left px-4 py-2.5 text-sm transition-all flex items-center gap-2 relative overflow-hidden group",
+                          "w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center gap-2 relative overflow-hidden group",
                           filterStatus === option.value ? "text-brand-400 font-medium bg-brand-500/10" : "text-surface-300 hover:text-white hover:bg-surface-700/50"
                         )}
                       >
@@ -645,9 +660,10 @@ export default function EtollPage() {
                         <span>{option.label}</span>
                       </button>
                     ))}
-                  </div>
+                  </motion.div>
                 </>
               )}
+              </AnimatePresence>
             </div>
           <button
             onClick={handleNFCScan}
