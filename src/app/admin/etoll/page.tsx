@@ -24,7 +24,8 @@ import {
   Trash2,
   Download,
   Upload,
-  Nfc
+  Nfc,
+  ListFilter
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { mockUsers } from "@/lib/mock-data";
@@ -589,7 +590,7 @@ export default function EtollPage() {
 
       {/* Search */}
       <div className="glass-card p-4">
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-500" />
             <input
@@ -601,6 +602,24 @@ export default function EtollPage() {
               className="w-full pl-10 pr-4 py-2.5 bg-surface-900 border border-surface-700 text-white rounded-xl focus:outline-none focus:border-brand-500 transition-colors"
             />
           </div>
+          <div className="flex gap-2">
+            <div className="relative min-w-[160px]">
+              <ListFilter className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-500 pointer-events-none" />
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value as any)}
+                className="w-full pl-10 pr-8 py-2.5 bg-surface-900 border border-surface-700 text-white rounded-xl focus:outline-none focus:border-brand-500 transition-colors appearance-none cursor-pointer"
+              >
+                <option value="all">Semua</option>
+                <option value="in_use">Di Pinjam</option>
+                <option value="returned">Di Kembalikan</option>
+              </select>
+              <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-surface-500">
+                <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20">
+                  <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                </svg>
+              </div>
+            </div>
           <button
             onClick={handleNFCScan}
             className={cn(
@@ -614,6 +633,7 @@ export default function EtollPage() {
             <Nfc className={cn("w-5 h-5", isScanningNFC && "animate-bounce")} />
             <span className="text-[10px] font-bold tracking-wider">NFC</span>
           </button>
+        </div>
         </div>
       </div>
 
