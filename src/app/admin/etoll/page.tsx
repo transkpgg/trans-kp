@@ -623,7 +623,7 @@ export default function EtollPage() {
               {isFilterDropdownOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setIsFilterDropdownOpen(false)} />
-                  <div className="absolute z-50 w-full bottom-full mb-2 py-1.5 bg-surface-800/95 backdrop-blur-md border border-surface-700/50 rounded-xl shadow-2xl overflow-hidden">
+                  <div className="absolute z-50 w-full bottom-full mb-2 py-1.5 bg-surface-800 border border-surface-700 rounded-xl shadow-2xl overflow-hidden">
                     {[
                       { value: "all", label: "Semua Status" },
                       { value: "in_use", label: "Di Pinjam" },
@@ -641,7 +641,7 @@ export default function EtollPage() {
                         {filterStatus === option.value && (
                           <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-brand-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]" />
                         )}
-                        <div className={cn("w-1.5 h-1.5 rounded-full", filterStatus === option.value ? "bg-brand-500 animate-pulse" : "bg-transparent")} />
+                        <div className={cn("w-1.5 h-1.5 rounded-full", filterStatus === option.value ? "bg-brand-500" : "bg-transparent")} />
                         <span>{option.label}</span>
                       </button>
                     ))}
