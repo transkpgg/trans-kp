@@ -623,7 +623,7 @@ export default function EtollPage() {
               {isFilterDropdownOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setIsFilterDropdownOpen(false)} />
-                  <div className="absolute z-50 w-full mt-2 py-1.5 bg-surface-800/95 backdrop-blur-md border border-surface-700/50 rounded-xl shadow-2xl overflow-hidden fade-in-up">
+                  <div className="absolute z-50 w-full bottom-full mb-2 py-1.5 bg-surface-800/95 backdrop-blur-md border border-surface-700/50 rounded-xl shadow-2xl overflow-hidden">
                     {[
                       { value: "all", label: "Semua Status" },
                       { value: "in_use", label: "Di Pinjam" },
