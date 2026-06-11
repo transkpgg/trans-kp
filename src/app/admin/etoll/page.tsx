@@ -160,6 +160,7 @@ export default function EtollPage() {
   
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | EtollStatus>("all");
+  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const [selectedCard, setSelectedCard] = useState<EtollCard | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
@@ -603,22 +604,50 @@ export default function EtollPage() {
             />
           </div>
           <div className="flex gap-2">
-            <div className="relative min-w-[160px]">
-              <ListFilter className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-500 pointer-events-none" />
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value as any)}
-                className="w-full pl-10 pr-8 py-2.5 bg-surface-900 border border-surface-700 text-white rounded-xl focus:outline-none focus:border-brand-500 transition-colors appearance-none cursor-pointer"
+            <div className="relative min-w-[180px]">
+              <button
+                onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
+                className="w-full flex items-center justify-between pl-10 pr-4 py-2.5 bg-surface-900 border border-surface-700 text-white rounded-xl focus:outline-none focus:border-brand-500 hover:border-brand-500/50 hover:shadow-lg hover:shadow-brand-500/10 transition-all cursor-pointer"
               >
-                <option value="all">Semua</option>
-                <option value="in_use">Di Pinjam</option>
-                <option value="returned">Di Kembalikan</option>
-              </select>
-              <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-surface-500">
-                <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20">
+                <div className="flex items-center gap-2">
+                  <ListFilter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-400" />
+                  <span className="text-sm font-medium">
+                    {filterStatus === "all" ? "Semua Status" : filterStatus === "in_use" ? "Di Pinjam" : filterStatus === "returned" ? "Di Kembalikan" : filterStatus === "lost" ? "Hilang" : "Semua Status"}
+                  </span>
+                </div>
+                <svg className={cn("w-4 h-4 fill-current text-surface-500 transition-transform duration-300", isFilterDropdownOpen && "rotate-180 text-brand-400")} viewBox="0 0 20 20">
                   <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
                 </svg>
-              </div>
+              </button>
+              
+              {isFilterDropdownOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsFilterDropdownOpen(false)} />
+                  <div className="absolute z-50 w-full mt-2 py-1.5 bg-surface-800/95 backdrop-blur-md border border-surface-700/50 rounded-xl shadow-2xl overflow-hidden fade-in-up">
+                    {[
+                      { value: "all", label: "Semua Status" },
+                      { value: "in_use", label: "Di Pinjam" },
+                      { value: "returned", label: "Di Kembalikan" },
+                      { value: "lost", label: "Hilang" }
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() => { setFilterStatus(option.value as any); setIsFilterDropdownOpen(false); }}
+                        className={cn(
+                          "w-full text-left px-4 py-2.5 text-sm transition-all flex items-center gap-2 relative overflow-hidden group",
+                          filterStatus === option.value ? "text-brand-400 font-medium bg-brand-500/10" : "text-surface-300 hover:text-white hover:bg-surface-700/50"
+                        )}
+                      >
+                        {filterStatus === option.value && (
+                          <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-brand-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]" />
+                        )}
+                        <div className={cn("w-1.5 h-1.5 rounded-full", filterStatus === option.value ? "bg-brand-500 animate-pulse" : "bg-transparent")} />
+                        <span>{option.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           <button
             onClick={handleNFCScan}
