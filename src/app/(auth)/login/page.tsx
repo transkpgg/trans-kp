@@ -44,115 +44,208 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="glass-card p-8 w-full border-t border-t-white/10 shadow-2xl">
-      <div className="flex flex-col items-center mb-8 mt-4">
-        <h1 className="text-2xl font-bold text-white tracking-tight">Trans KP</h1>
-      </div>
+    <div className={cn(
+      "glass-card p-8 w-full border-t border-t-white/10 shadow-2xl relative overflow-hidden transition-shadow duration-500",
+      isLoading && "shadow-[0_0_40px_rgba(0,82,255,0.1)]"
+    )}>
+      {/* Indeterminate Linear Progress Bar */}
+      {isLoading && (
+        <div className="absolute top-0 left-0 right-0 h-1 bg-[#F0F4F8]/20 overflow-hidden rounded-t-2xl">
+          <div 
+            className="h-full bg-[#0052FF] rounded-full"
+            style={{
+              animation: "indeterminate-progress 1.5s ease-in-out infinite",
+              width: "40%",
+            }}
+          />
+        </div>
+      )}
 
-      <form onSubmit={handleLogin} className="space-y-5">
-        {error && (
-          <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2 fade-in">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-            {error}
-          </div>
-        )}
-
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium text-surface-300 ml-1">Username</label>
+      {/* Loading Overlay */}
+      {isLoading && (
+        <div className="absolute inset-0 bg-white/5 backdrop-blur-[2px] rounded-2xl z-20 flex flex-col items-center justify-center gap-4 fade-in">
+          {/* Circular Spinner - 270deg arc, 2px stroke */}
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <User className="h-5 w-5 text-surface-500" />
-            </div>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full bg-surface-900/50 border border-surface-700 text-white rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all placeholder:text-surface-600"
-              placeholder="Masukkan username"
-            />
+            <svg 
+              className="h-12 w-12"
+              viewBox="0 0 48 48" 
+              fill="none" 
+              xmlns="http://www.w3.org/2000/svg"
+              style={{ animation: "spinner-rotate 1s linear infinite" }}
+            >
+              {/* Track */}
+              <circle 
+                cx="24" 
+                cy="24" 
+                r="20" 
+                stroke="#F0F4F8"
+                strokeWidth="2"
+                opacity="0.2"
+              />
+              {/* Active arc - 270 degrees */}
+              <circle 
+                cx="24" 
+                cy="24" 
+                r="20" 
+                stroke="#0052FF"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeDasharray="94.25 31.42"
+                style={{ filter: "drop-shadow(0 0 6px rgba(0,82,255,0.4))" }}
+              />
+            </svg>
           </div>
+          {/* Status Label */}
+          <span 
+            className="text-xs font-semibold text-[#64748B] tracking-[0.05em] uppercase"
+            style={{ fontFamily: "Inter, sans-serif" }}
+          >
+            MEMPROSES
+          </span>
+        </div>
+      )}
+
+      <div className={cn("transition-opacity duration-300", isLoading && "opacity-30")}>
+        <div className="flex flex-col items-center mb-8 mt-4">
+          <h1 className="text-2xl font-bold text-white tracking-tight" style={{ letterSpacing: "-0.02em" }}>Trans KP</h1>
         </div>
 
-        <div className="space-y-1">
-          <label className="text-sm font-medium text-surface-300">Password</label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Lock className="h-5 w-5 text-surface-500" />
+        <form onSubmit={handleLogin} className="space-y-5">
+          {error && (
+            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2 fade-in">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+              {error}
             </div>
-            <input
-              type={showPassword ? "text" : "password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-surface-900/50 border border-surface-700 text-white rounded-xl pl-10 pr-12 py-3 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all placeholder:text-surface-600"
-              placeholder="••••••••"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute inset-y-0 right-0 pr-3 flex items-center text-surface-500 hover:text-surface-300 transition-colors"
-            >
-              {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+          )}
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-surface-300 ml-1">Username</label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <User className="h-5 w-5 text-surface-500" />
+              </div>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                disabled={isLoading}
+                className="w-full bg-surface-900/50 border border-surface-700 text-white rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all placeholder:text-surface-600 disabled:cursor-not-allowed"
+                placeholder="Masukkan username"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-surface-300">Password</label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Lock className="h-5 w-5 text-surface-500" />
+              </div>
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
+                className="w-full bg-surface-900/50 border border-surface-700 text-white rounded-xl pl-10 pr-12 py-3 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all placeholder:text-surface-600 disabled:cursor-not-allowed"
+                placeholder="••••••••"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                disabled={isLoading}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-surface-500 hover:text-surface-300 transition-colors"
+              >
+                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="remember"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                disabled={isLoading}
+                className="w-4 h-4 rounded border-surface-600 text-brand-500 focus:ring-brand-500/50 bg-surface-900/50 accent-brand-500"
+              />
+              <label htmlFor="remember" className="text-sm text-surface-300 cursor-pointer">
+                Remember Me
+              </label>
+            </div>
+            <button type="button" className="text-sm text-brand-400 hover:text-brand-300 transition-colors">
+              Lupa Password?
             </button>
           </div>
-        </div>
 
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="remember"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-              className="w-4 h-4 rounded border-surface-600 text-brand-500 focus:ring-brand-500/50 bg-surface-900/50 accent-brand-500"
-            />
-            <label htmlFor="remember" className="text-sm text-surface-300 cursor-pointer">
-              Remember Me
-            </label>
-          </div>
-          <button type="button" className="text-sm text-brand-400 hover:text-brand-300 transition-colors">
-            Lupa Password?
-          </button>
-        </div>
-
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="w-full bg-[#0052FF] text-white font-medium py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-[#003ec7] hover:shadow-lg hover:shadow-[#0052FF]/25 transition-all disabled:opacity-70 disabled:cursor-not-allowed group mt-2"
-        >
-          {isLoading ? (
-            <div className="flex items-center justify-center w-full">
+          <button
+            type="submit"
+            disabled={isLoading}
+            className={cn(
+              "w-full text-white font-medium py-3 rounded-xl flex items-center justify-center gap-2 transition-all duration-300 disabled:cursor-not-allowed group mt-2",
+              isLoading 
+                ? "bg-[#0052FF]/70 shadow-[0_0_20px_rgba(0,82,255,0.3)]" 
+                : "bg-[#0052FF] hover:bg-[#003ec7] hover:shadow-lg hover:shadow-[#0052FF]/25"
+            )}
+          >
+            {isLoading ? (
               <svg 
-                className="animate-spin h-5 w-5 text-white" 
+                className="h-5 w-5 text-white"
                 viewBox="0 0 24 24" 
                 fill="none" 
                 xmlns="http://www.w3.org/2000/svg"
+                style={{ animation: "spinner-rotate 1s linear infinite" }}
               >
                 <circle 
                   cx="12" 
                   cy="12" 
                   r="10" 
-                  stroke="currentColor" 
+                  stroke="currentColor"
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeDasharray="47 16"
                 />
               </svg>
-            </div>
-          ) : (
-            <>
-              Masuk
-              <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
-            </>
-          )}
-        </button>
-      </form>
+            ) : (
+              <>
+                Masuk
+                <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+              </>
+            )}
+          </button>
+        </form>
 
-
-      <div className="mt-5 pt-4 border-t border-surface-700/50 text-center">
-        <p className="text-xs text-surface-500">
-          Versi {process.env.APP_VERSION || "1.0.0"} &bull; &copy; {new Date().getFullYear()} Trans KP
-        </p>
+        <div className="mt-5 pt-4 border-t border-surface-700/50 text-center">
+          <p className="text-xs text-surface-500">
+            Versi {process.env.APP_VERSION || "1.0.0"} &bull; &copy; {new Date().getFullYear()} Trans KP
+          </p>
+        </div>
       </div>
+
+      {/* Inline keyframe styles */}
+      <style jsx>{`
+        @keyframes indeterminate-progress {
+          0% {
+            transform: translateX(-100%);
+          }
+          50% {
+            transform: translateX(100%);
+          }
+          100% {
+            transform: translateX(250%);
+          }
+        }
+        @keyframes spinner-rotate {
+          from {
+            transform: rotate(0deg);
+          }
+          to {
+            transform: rotate(360deg);
+          }
+        }
+      `}</style>
     </div>
   );
 }
+
