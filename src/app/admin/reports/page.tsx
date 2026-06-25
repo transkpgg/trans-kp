@@ -4,6 +4,7 @@ import { useState } from "react";
 import { FileText, FileSpreadsheet, Calendar, Filter, Download } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { mockMonthlyChartData } from "@/lib/mock-data";
+import { toast } from "sonner";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
 import useSWR from "swr";
@@ -16,6 +17,7 @@ const fetcher = (url: string) => fetch(url).then(res => res.json());
 
 export default function ReportsPage() {
   const [reportType, setReportType] = useState("hotel");
+  const [isExporting, setIsExporting] = useState(false);
   
   const { data: hotelData } = useSWR("/api/hotel-visits", fetcher);
   const { data: etollData } = useSWR("/api/etoll", fetcher);
@@ -24,94 +26,166 @@ export default function ReportsPage() {
   const etollCards = Array.isArray(etollData) ? etollData : [];
 
   const exportToExcel = () => {
-    let data = [];
-    let filename = "";
+    try {
+      let data = [];
+      let filename = "";
 
-    if (reportType === "hotel") {
-      filename = `Laporan_Kunjungan_Hotel_${format(new Date(), "ddMMyyyy")}.xlsx`;
-      data = hotelVisits.map((visit: any) => ({
-        "Tgl Check In": visit.check_in_time ? format(new Date(visit.check_in_time), "dd MMM yyyy HH:mm") : "-",
-        "Tgl Check Out": visit.check_out_time ? format(new Date(visit.check_out_time), "dd MMM yyyy HH:mm") : "-",
-        "Pengemudi": visit.user?.full_name || "-",
-        "Hotel": visit.hotel_name || "-",
-        "Durasi": visit.duration_minutes ? getDurationString(visit.duration_minutes) : "-",
-        "Status": visit.check_out_time ? "Selesai" : "Menginap",
-        "Foto Check In (URL)": visit.selfie_check_in_url || "-",
-        "GPS Check In": (visit.check_in_lat && visit.check_in_lng) ? `https://maps.google.com/?q=${visit.check_in_lat},${visit.check_in_lng}` : "-",
-        "Foto Check Out (URL)": visit.selfie_check_out_url || "-",
-        "GPS Check Out": (visit.check_out_lat && visit.check_out_lng) ? `https://maps.google.com/?q=${visit.check_out_lat},${visit.check_out_lng}` : "-"
-      }));
-    } else {
-      filename = `Laporan_EToll_${format(new Date(), "ddMMyyyy")}.xlsx`;
-      data = etollCards.map((card: any) => ({
-        "No. Kartu": card.card_number || "-",
-        "Nama Kartu": card.name || card.card_name || "-",
-        "Sisa Saldo": card.balance || 0,
-        "Status": card.status === "in_use" ? "Sedang Dipakai" : card.status === "returned" ? "Sudah Kembali" : card.status === "lost" ? "Hilang" : "Tersedia",
-        "Pemakai Aktif": (card.status === "in_use" && card.histories?.[0]?.user?.full_name) ? card.histories[0].user.full_name : "-",
-        "Terakhir Dipakai": card.histories?.[0]?.timestamp ? format(new Date(card.histories[0].timestamp), "dd MMM yyyy HH:mm") : "-"
-      }));
+      const safeFormat = (dateStr: string, fmt: string) => {
+        try { return format(new Date(dateStr), fmt); } catch (e) { return "-"; }
+      };
+
+      if (reportType === "hotel") {
+        filename = `Laporan_Kunjungan_Hotel_${format(new Date(), "ddMMyyyy")}.xlsx`;
+        data = hotelVisits.map((visit: any) => ({
+          "Tgl Check In": visit.check_in_time ? safeFormat(visit.check_in_time, "dd MMM yyyy HH:mm") : "-",
+          "Tgl Check Out": visit.check_out_time ? safeFormat(visit.check_out_time, "dd MMM yyyy HH:mm") : "-",
+          "Pengemudi": visit.user?.full_name || "-",
+          "Hotel": visit.hotel_name || "-",
+          "Durasi": visit.duration_minutes ? getDurationString(visit.duration_minutes) : "-",
+          "Status": visit.check_out_time ? "Selesai" : "Menginap",
+          "Foto Check In (URL)": visit.selfie_check_in_url || "-",
+          "GPS Check In": (visit.check_in_lat && visit.check_in_lng) ? `https://maps.google.com/?q=${visit.check_in_lat},${visit.check_in_lng}` : "-",
+          "Foto Check Out (URL)": visit.selfie_check_out_url || "-",
+          "GPS Check Out": (visit.check_out_lat && visit.check_out_lng) ? `https://maps.google.com/?q=${visit.check_out_lat},${visit.check_out_lng}` : "-"
+        }));
+      } else {
+        filename = `Laporan_EToll_${format(new Date(), "ddMMyyyy")}.xlsx`;
+        data = etollCards.map((card: any) => ({
+          "No. Kartu": card.card_number || "-",
+          "Nama Kartu": card.name || card.card_name || "-",
+          "Sisa Saldo": card.balance || 0,
+          "Status": card.status === "in_use" ? "Sedang Dipakai" : card.status === "returned" ? "Sudah Kembali" : card.status === "lost" ? "Hilang" : "Tersedia",
+          "Pemakai Aktif": (card.status === "in_use" && card.histories?.[0]?.user?.full_name) ? card.histories[0].user.full_name : "-",
+          "Terakhir Dipakai": card.histories?.[0]?.timestamp ? safeFormat(card.histories[0].timestamp, "dd MMM yyyy HH:mm") : "-"
+        }));
+      }
+
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Laporan");
+      XLSX.writeFile(wb, filename);
+      toast.success(`Laporan Excel berhasil diunduh`);
+    } catch (error) {
+      console.error("Excel export error:", error);
+      toast.error("Gagal mengunduh Excel, data bermasalah.");
     }
-
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Laporan");
-    XLSX.writeFile(wb, filename);
   };
 
-  const exportToPDF = () => {
-    const doc = new jsPDF("l", "pt", "a4");
-    doc.setFontSize(16);
-    
-    if (reportType === "hotel") {
-      doc.text("Laporan Kunjungan Hotel", 40, 40);
-      doc.setFontSize(10);
-      doc.text(`Tanggal Cetak: ${format(new Date(), "dd MMMM yyyy HH:mm", { locale: id })}`, 40, 60);
-
-      const tableData = hotelVisits.map((visit: any) => [
-        visit.check_in_time ? format(new Date(visit.check_in_time), "dd MMM yyyy\nHH:mm") : "-",
-        visit.user?.full_name || "-",
-        visit.hotel_name || "-",
-        visit.duration_minutes ? getDurationString(visit.duration_minutes) : "-",
-        visit.check_out_time ? "Selesai" : "Menginap",
-        visit.selfie_check_in_url ? "Link Foto" : "-",
-        (visit.check_in_lat && visit.check_in_lng) ? `${visit.check_in_lat},\n${visit.check_in_lng}` : "-",
-      ]);
-
-      autoTable(doc, {
-        startY: 80,
-        head: [["Check In", "Pengemudi", "Hotel", "Durasi", "Status", "Foto", "GPS"]],
-        body: tableData,
-        styles: { fontSize: 8, cellPadding: 4 },
-        headStyles: { fillColor: [16, 185, 129] },
-        columnStyles: {
-          5: { cellWidth: 50 },
-          6: { cellWidth: 80 }
+  const getBase64Image = (url: string): Promise<string | null> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = "Anonymous";
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX_WIDTH = 400;
+        const scale = Math.min(MAX_WIDTH / img.width, 1);
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL("image/jpeg", 0.6));
+        } else {
+          resolve(null);
         }
-      });
-      doc.save(`Laporan_Kunjungan_Hotel_${format(new Date(), "ddMMyyyy")}.pdf`);
-    } else {
-      doc.text("Laporan Penggunaan E-Toll", 40, 40);
-      doc.setFontSize(10);
-      doc.text(`Tanggal Cetak: ${format(new Date(), "dd MMMM yyyy HH:mm", { locale: id })}`, 40, 60);
+      };
+      img.onerror = () => resolve(null);
+      img.src = url;
+    });
+  };
 
-      const tableData = etollCards.map((card: any) => [
-        card.card_number || "-",
-        card.name || card.card_name || "-",
-        `Rp ${(card.balance || 0).toLocaleString('id-ID')}`,
-        card.status === "in_use" ? "Sedang Dipakai" : card.status === "returned" ? "Sudah Kembali" : card.status === "lost" ? "Hilang" : "Tersedia",
-        (card.status === "in_use" && card.histories?.[0]?.user?.full_name) ? card.histories[0].user.full_name : "-",
-        card.histories?.[0]?.timestamp ? format(new Date(card.histories[0].timestamp), "dd MMM yyyy\nHH:mm") : "-"
-      ]);
+  const exportToPDF = async () => {
+    try {
+      setIsExporting(true);
+      const loadingId = toast.loading("Sedang menyiapkan PDF...");
+      
+      const doc = new jsPDF("l", "pt", "a4");
+      doc.setFontSize(16);
+      
+      const safeFormat = (dateStr: string, fmt: string) => {
+        try { return format(new Date(dateStr), fmt); } catch (e) { return "-"; }
+      };
 
-      autoTable(doc, {
-        startY: 80,
-        head: [["No. Kartu", "Nama Kartu", "Saldo", "Status", "Pemakai Aktif", "Tgl Terakhir"]],
-        body: tableData,
-        styles: { fontSize: 9, cellPadding: 4 },
-        headStyles: { fillColor: [16, 185, 129] }
-      });
-      doc.save(`Laporan_EToll_${format(new Date(), "ddMMyyyy")}.pdf`);
+      if (reportType === "hotel") {
+        doc.text("Laporan Kunjungan Hotel", 40, 40);
+        doc.setFontSize(10);
+        doc.text(`Tanggal Cetak: ${format(new Date(), "dd MMMM yyyy HH:mm", { locale: id })}`, 40, 60);
+
+        // Preload images
+        const preloadedImages: (string | null)[] = await Promise.all(
+          hotelVisits.map((visit: any) => 
+            visit.selfie_check_in_url ? getBase64Image(visit.selfie_check_in_url) : Promise.resolve(null)
+          )
+        );
+
+        const tableData = hotelVisits.map((visit: any) => [
+          visit.check_in_time ? safeFormat(visit.check_in_time, "dd MMM yyyy\nHH:mm") : "-",
+          visit.user?.full_name || "-",
+          visit.hotel_name || "-",
+          visit.duration_minutes ? getDurationString(visit.duration_minutes) : "-",
+          visit.check_out_time ? "Selesai" : "Menginap",
+          "", // Placeholder for image
+          (visit.check_in_lat && visit.check_in_lng) ? `${visit.check_in_lat},\n${visit.check_in_lng}` : "-",
+        ]);
+
+        autoTable(doc, {
+          startY: 80,
+          head: [["Check In", "Pengemudi", "Hotel", "Durasi", "Status", "Foto", "GPS"]],
+          body: tableData,
+          styles: { fontSize: 8, cellPadding: 4, minCellHeight: 45 },
+          headStyles: { fillColor: [16, 185, 129] },
+          columnStyles: {
+            5: { cellWidth: 50 },
+            6: { cellWidth: 80 }
+          },
+          didDrawCell: function(data) {
+            if (data.column.index === 5 && data.cell.section === 'body') {
+              const base64Img = preloadedImages[data.row.index];
+              if (base64Img) {
+                // Adjust position to center image in cell
+                doc.addImage(base64Img, 'JPEG', data.cell.x + 5, data.cell.y + 2, 40, 40);
+              } else {
+                const visit = hotelVisits[data.row.index];
+                if (!visit.selfie_check_in_url) {
+                  doc.text("-", data.cell.x + 20, data.cell.y + 25);
+                } else {
+                  doc.text("Gagal Muat", data.cell.x + 5, data.cell.y + 25);
+                }
+              }
+            }
+          }
+        });
+        doc.save(`Laporan_Kunjungan_Hotel_${format(new Date(), "ddMMyyyy")}.pdf`);
+      } else {
+        doc.text("Laporan Penggunaan E-Toll", 40, 40);
+        doc.setFontSize(10);
+        doc.text(`Tanggal Cetak: ${format(new Date(), "dd MMMM yyyy HH:mm", { locale: id })}`, 40, 60);
+
+        const tableData = etollCards.map((card: any) => [
+          card.card_number || "-",
+          card.name || card.card_name || "-",
+          `Rp ${(card.balance || 0).toLocaleString('id-ID')}`,
+          card.status === "in_use" ? "Sedang Dipakai" : card.status === "returned" ? "Sudah Kembali" : card.status === "lost" ? "Hilang" : "Tersedia",
+          (card.status === "in_use" && card.histories?.[0]?.user?.full_name) ? card.histories[0].user.full_name : "-",
+          card.histories?.[0]?.timestamp ? safeFormat(card.histories[0].timestamp, "dd MMM yyyy\nHH:mm") : "-"
+        ]);
+
+        autoTable(doc, {
+          startY: 80,
+          head: [["No. Kartu", "Nama Kartu", "Saldo", "Status", "Pemakai Aktif", "Tgl Terakhir"]],
+          body: tableData,
+          styles: { fontSize: 9, cellPadding: 4 },
+          headStyles: { fillColor: [16, 185, 129] }
+        });
+        doc.save(`Laporan_EToll_${format(new Date(), "ddMMyyyy")}.pdf`);
+      }
+      toast.dismiss(loadingId);
+      toast.success("PDF berhasil diunduh");
+    } catch (error) {
+      console.error("PDF export error:", error);
+      toast.error("Gagal mengunduh PDF");
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -181,10 +255,11 @@ export default function ReportsPage() {
             <div className="mt-8 space-y-3 pt-6 border-t border-surface-800">
               <button 
                 onClick={exportToPDF}
-                className="w-full py-3 rounded-xl bg-red-500/10 text-red-500 border border-red-500/30 font-medium hover:bg-red-500 hover:text-white transition-all flex items-center justify-center gap-2 group"
+                disabled={isExporting}
+                className="w-full py-3 rounded-xl bg-red-500/10 text-red-500 border border-red-500/30 font-medium hover:bg-red-500 hover:text-white transition-all flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <FileText className="w-5 h-5 group-hover:-translate-y-0.5 transition-transform" />
-                Unduh PDF
+                {isExporting ? "Menyiapkan PDF..." : "Unduh PDF"}
               </button>
               <button 
                 onClick={exportToExcel}
