@@ -29,7 +29,8 @@ export default function AdminHotelVisitsPage() {
   });
 
   return (
-    <div className="space-y-6 slide-up">
+    <>
+      <div className="space-y-6 slide-up">
       <div>
         <h1 className="text-2xl font-bold text-white">Monitoring Kunjungan Hotel</h1>
         <p className="text-sm text-surface-400 mt-1">Pantau check-in dan check-out hotel oleh driver.</p>
@@ -210,11 +211,12 @@ export default function AdminHotelVisitsPage() {
           </div>
         ))}
       </div>
+    </div>
 
       {/* Modals */}
       {selectedPhoto && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm fade-in">
-          <div className="glass-card max-w-md w-full overflow-hidden flex flex-col">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm fade-in" onClick={() => setSelectedPhoto(null)}>
+          <div className="glass-card max-w-md w-full overflow-hidden flex flex-col transform transition-all scale-100 opacity-100 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-surface-700 flex justify-between items-center">
               <h2 className="font-bold text-white">Bukti Foto Selfie</h2>
               <button onClick={() => setSelectedPhoto(null)} className="p-1 hover:bg-surface-700 rounded-lg text-surface-400">
@@ -229,8 +231,8 @@ export default function AdminHotelVisitsPage() {
       )}
 
       {selectedMap && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm fade-in">
-          <div className="glass-card max-w-2xl w-full overflow-hidden flex flex-col">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm fade-in" onClick={() => setSelectedMap(null)}>
+          <div className="glass-card max-w-2xl w-full overflow-hidden flex flex-col transform transition-all scale-100 opacity-100 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-surface-700 flex justify-between items-center">
               <div>
                 <h2 className="font-bold text-white">Lokasi GPS Validasi</h2>
@@ -253,6 +255,6 @@ export default function AdminHotelVisitsPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

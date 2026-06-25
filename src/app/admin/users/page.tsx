@@ -159,7 +159,8 @@ export default function UsersPage() {
   if (!users) return <div className="p-8 text-center text-white">Loading...</div>;
 
   return (
-    <div className="space-y-6 slide-up">
+    <>
+      <div className="space-y-6 slide-up">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Manajemen Pengguna</h1>
@@ -282,10 +283,11 @@ export default function UsersPage() {
           </table>
         </div>
       </div>
+    </div>
 
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm fade-in">
-          <div className="glass-card w-full max-w-lg overflow-hidden flex flex-col">
+          <div className="glass-card w-full max-w-lg overflow-hidden flex flex-col transform transition-all scale-100 opacity-100 shadow-2xl">
             <div className="p-6 border-b border-surface-700">
               <h2 className="text-xl font-bold text-white">
                 {editUserId ? "Edit Pengguna" : "Tambah Pengguna Baru"}
@@ -347,6 +349,6 @@ export default function UsersPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
