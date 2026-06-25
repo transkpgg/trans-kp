@@ -48,24 +48,24 @@ export default function AdminHotelVisitsPage() {
           />
         </div>
         
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-500" />
+        <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
+          <div className="relative w-full sm:w-auto">
+            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-500 pointer-events-none z-10" />
             <input 
               type="date" 
               value={dateRange.start}
               onChange={(e) => setDateRange({...dateRange, start: e.target.value})}
-              className="w-full pl-9 pr-3 py-2.5 bg-surface-900 border border-surface-700 text-white text-sm rounded-xl focus:outline-none focus:border-brand-500 [color-scheme:dark]"
+              className="w-full sm:w-auto pl-9 pr-3 py-2.5 bg-surface-900 border border-surface-700 text-white text-sm rounded-xl focus:outline-none focus:border-brand-500 [color-scheme:dark]"
             />
           </div>
-          <span className="text-surface-500">-</span>
-          <div className="relative">
-            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-500" />
+          <span className="text-surface-500 hidden sm:block">-</span>
+          <div className="relative w-full sm:w-auto">
+            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-500 pointer-events-none z-10" />
             <input 
               type="date" 
               value={dateRange.end}
               onChange={(e) => setDateRange({...dateRange, end: e.target.value})}
-              className="w-full pl-9 pr-3 py-2.5 bg-surface-900 border border-surface-700 text-white text-sm rounded-xl focus:outline-none focus:border-brand-500 [color-scheme:dark]"
+              className="w-full sm:w-auto pl-9 pr-3 py-2.5 bg-surface-900 border border-surface-700 text-white text-sm rounded-xl focus:outline-none focus:border-brand-500 [color-scheme:dark]"
             />
           </div>
         </div>
