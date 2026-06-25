@@ -601,6 +601,7 @@ export default function EtollPage() {
               placeholder="Cari no. kartu, nama kartu, atau nama pengemudi..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
               className="w-full pl-10 pr-4 py-2.5 bg-surface-900 border border-surface-700 text-white rounded-xl focus:outline-none focus:border-brand-500 transition-colors"
             />
           </div>
@@ -958,6 +959,7 @@ export default function EtollPage() {
                          setAssignDriverId(""); 
                        }}
                        onFocus={() => setIsAssignDriverDropdownOpen(true)}
+                       onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
                        className="w-full bg-transparent text-white px-3 py-2.5 text-sm focus:outline-none"
                      />
                      {assignDriverSearch && (
