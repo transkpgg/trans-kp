@@ -15,6 +15,15 @@ import { getDurationString } from "@/lib/utils";
 
 const fetcher = (url: string) => fetch(url).then(res => res.json());
 
+const safeFormatDate = (dateStr: any, fmt: string) => {
+  if (!dateStr) return "-";
+  try {
+    return format(new Date(dateStr), fmt, { locale: id });
+  } catch (e) {
+    return "-";
+  }
+};
+
 export default function ReportsPage() {
   const [reportType, setReportType] = useState("hotel");
   const [isExporting, setIsExporting] = useState(false);
@@ -318,7 +327,7 @@ export default function ReportsPage() {
                     <tbody className="divide-y divide-surface-800/50 text-surface-200">
                       {hotelVisits.slice(0, 4).map((visit: any) => (
                         <tr key={visit.id}>
-                          <td className="py-3">{format(new Date(visit.check_in_time), "dd MMM yyyy", { locale: id })}</td>
+                          <td className="py-3">{visit.check_in_time ? safeFormatDate(visit.check_in_time, "dd MMM yyyy") : "-"}</td>
                           <td className="py-3 font-medium">{visit.user?.full_name || "Pengemudi"}</td>
                           <td className="py-3">{visit.hotel_name}</td>
                           <td className="py-3 text-center">

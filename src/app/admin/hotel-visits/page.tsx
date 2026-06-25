@@ -9,6 +9,15 @@ import { getDurationString, formatTime, cn } from "@/lib/utils";
 
 const fetcher = (url: string) => fetch(url).then(res => res.json());
 
+const safeFormatDate = (dateStr: any, fmt: string) => {
+  if (!dateStr) return "-";
+  try {
+    return format(new Date(dateStr), fmt, { locale: id });
+  } catch (e) {
+    return "-";
+  }
+};
+
 export default function AdminHotelVisitsPage() {
   const [search, setSearch] = useState("");
   const [dateRange, setDateRange] = useState({ 
@@ -125,7 +134,7 @@ export default function AdminHotelVisitsPage() {
                     <Clock className="w-3.5 h-3.5" /> Check In
                   </p>
                   <p className="font-medium text-white">
-                    {format(new Date(visit.check_in_time), "dd MMM yyyy", { locale: id })}
+                    {safeFormatDate(visit.check_in_time, "dd MMM yyyy")}
                   </p>
                   <p className="text-sm text-brand-400 font-mono mt-0.5">
                     {formatTime(visit.check_in_time)} WIB
@@ -138,7 +147,7 @@ export default function AdminHotelVisitsPage() {
                   {visit.check_out_time ? (
                     <>
                       <p className="font-medium text-white">
-                        {format(new Date(visit.check_out_time), "dd MMM yyyy", { locale: id })}
+                        {safeFormatDate(visit.check_out_time, "dd MMM yyyy")}
                       </p>
                       <p className="text-sm text-brand-400 font-mono mt-0.5">
                         {formatTime(visit.check_out_time)} WIB
