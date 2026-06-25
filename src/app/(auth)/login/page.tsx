@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Lock, User, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -14,32 +14,120 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
 
+  // Loading animation state
+  const [progress, setProgress] = useState(0);
+  const [statusText, setStatusText] = useState("Initializing System");
+  const progressInterval = useRef<NodeJS.Timeout | null>(null);
+  const loginPromise = useRef<Promise<any> | null>(null);
+  const loginResult = useRef<any>(null);
+  const loginError = useRef<string | null>(null);
+
+  const statuses = [
+    "Synchronizing Systems",
+    "Authenticating Credentials",
+    "Loading User Data",
+    "Finalizing Session",
+  ];
+
+  const startProgressAnimation = useCallback(() => {
+    setProgress(0);
+    setStatusText("Initializing System");
+
+    let currentProgress = 0;
+
+    progressInterval.current = setInterval(() => {
+      // Slow down as we approach certain thresholds to wait for API
+      let increment: number;
+      if (currentProgress < 30) {
+        increment = Math.random() * 1.5 + 0.5;
+      } else if (currentProgress < 60) {
+        increment = Math.random() * 0.8 + 0.2;
+      } else if (currentProgress < 85) {
+        increment = Math.random() * 0.4 + 0.1;
+      } else {
+        // Hold near 85-90% until API responds
+        if (!loginResult.current && !loginError.current) {
+          increment = currentProgress < 90 ? Math.random() * 0.1 : 0;
+        } else {
+          // API responded, rush to 100%
+          increment = Math.random() * 3 + 2;
+        }
+      }
+
+      currentProgress += increment;
+      if (currentProgress > 100) currentProgress = 100;
+
+      setProgress(currentProgress);
+
+      // Update status text based on progress
+      const statusIndex = Math.floor((currentProgress / 100) * statuses.length);
+      const newStatus = statuses[Math.min(statusIndex, statuses.length - 1)];
+      setStatusText(newStatus);
+
+      if (currentProgress >= 100) {
+        if (progressInterval.current) clearInterval(progressInterval.current);
+        setStatusText("System Ready");
+      }
+    }, 40);
+  }, []);
+
+  // When progress reaches 100, handle the result
+  useEffect(() => {
+    if (progress >= 100 && isLoading) {
+      const timeout = setTimeout(() => {
+        if (loginError.current) {
+          setError(loginError.current);
+          setIsLoading(false);
+          loginError.current = null;
+          loginResult.current = null;
+        } else if (loginResult.current) {
+          const data = loginResult.current;
+          if (data.user.role === "admin_cabang" || data.user.role === "super_admin") {
+            router.push("/admin/dashboard");
+          } else {
+            router.push("/home");
+          }
+          loginResult.current = null;
+        }
+      }, 400);
+      return () => clearTimeout(timeout);
+    }
+  }, [progress, isLoading, router]);
+
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => {
+      if (progressInterval.current) clearInterval(progressInterval.current);
+    };
+  }, []);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
+    loginResult.current = null;
+    loginError.current = null;
 
+    // Start animation
+    startProgressAnimation();
+
+    // Fire API request
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
-      
+
       const data = await res.json();
-      
+
       if (!res.ok) {
         throw new Error(data.message || "Gagal login");
       }
 
-      if (data.user.role === "admin_cabang" || data.user.role === "super_admin") {
-        router.push("/admin/dashboard");
-      } else {
-        router.push("/home");
-      }
+      loginResult.current = data;
     } catch (err: any) {
-      setError(err.message);
-      setIsLoading(false);
+      loginError.current = err.message;
     }
   };
 
@@ -48,64 +136,79 @@ export default function LoginPage() {
       "glass-card p-8 w-full border-t border-t-white/10 shadow-2xl relative overflow-hidden transition-shadow duration-500",
       isLoading && "shadow-[0_0_40px_rgba(0,82,255,0.1)]"
     )}>
-      {/* Indeterminate Linear Progress Bar */}
-      {isLoading && (
-        <div className="absolute top-0 left-0 right-0 h-1 bg-[#F0F4F8]/20 overflow-hidden rounded-t-2xl">
-          <div 
-            className="h-full bg-[#0052FF] rounded-full"
-            style={{
-              animation: "indeterminate-progress 1.5s ease-in-out infinite",
-              width: "40%",
-            }}
-          />
-        </div>
-      )}
 
       {/* Loading Overlay */}
       {isLoading && (
-        <div className="absolute inset-0 bg-white/5 backdrop-blur-[2px] rounded-2xl z-20 flex flex-col items-center justify-center gap-4 fade-in">
-          {/* Circular Spinner - 270deg arc, 2px stroke */}
-          <div className="relative">
-            <svg 
-              className="h-12 w-12"
-              viewBox="0 0 48 48" 
-              fill="none" 
-              xmlns="http://www.w3.org/2000/svg"
-              style={{ animation: "spinner-rotate 1s linear infinite" }}
-            >
-              {/* Track */}
-              <circle 
-                cx="24" 
-                cy="24" 
-                r="20" 
-                stroke="#F0F4F8"
-                strokeWidth="2"
-                opacity="0.2"
-              />
-              {/* Active arc - 270 degrees */}
-              <circle 
-                cx="24" 
-                cy="24" 
-                r="20" 
-                stroke="#0052FF"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeDasharray="94.25 31.42"
-                style={{ filter: "drop-shadow(0 0 6px rgba(0,82,255,0.4))" }}
-              />
-            </svg>
-          </div>
-          {/* Status Label */}
-          <span 
-            className="text-xs font-semibold text-[#64748B] tracking-[0.05em] uppercase"
-            style={{ fontFamily: "Inter, sans-serif" }}
+        <div className="absolute inset-0 bg-surface-900/80 backdrop-blur-[20px] rounded-2xl z-20 flex items-center justify-center"
+          style={{ animation: "overlayFadeIn 0.3s ease-out forwards" }}
+        >
+          <div className="w-full max-w-[280px] flex flex-col items-center space-y-6"
+            style={{ animation: "slideUpFade 1s cubic-bezier(0.2, 0.8, 0.2, 1) forwards" }}
           >
-            MEMPROSES
-          </span>
+            {/* "Please Wait" Header */}
+            <div className="w-full text-center">
+              <h2
+                className="text-[10px] font-bold tracking-[0.6em] uppercase leading-none"
+                style={{
+                  fontFamily: "'Inter', sans-serif",
+                  color: "#b7c4ff",
+                }}
+              >
+                Please Wait
+              </h2>
+            </div>
+
+            {/* Kinetic Loading Bar */}
+            <div className="w-full h-[3px] bg-white/5 rounded-full overflow-hidden relative">
+              <div
+                className="h-full rounded-full relative overflow-hidden transition-all duration-75 ease-out"
+                style={{
+                  width: `${progress}%`,
+                  backgroundColor: "#0052FF",
+                  boxShadow: "0 0 15px rgba(0,82,255,0.7)",
+                }}
+              >
+                {/* Shine overlay */}
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    background: "linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent)",
+                    animation: "shine 2.5s infinite linear",
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Percentage & Status */}
+            <div className="flex flex-col items-center space-y-4">
+              {/* Percentage */}
+              <div
+                className="text-[11px] font-medium tracking-[0.2em] uppercase opacity-40"
+                style={{
+                  fontFamily: "'Inter', sans-serif",
+                  color: "#b7c4ff",
+                }}
+              >
+                {Math.floor(progress)}%
+              </div>
+
+              {/* Status Text */}
+              <div
+                className="text-[8px] font-semibold tracking-[0.25em] uppercase transition-opacity duration-300"
+                style={{
+                  fontFamily: "'Inter', sans-serif",
+                  color: progress >= 100 ? "#0052FF" : "rgba(100, 116, 139, 0.4)",
+                  opacity: progress >= 100 ? 1 : undefined,
+                }}
+              >
+                {statusText}
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
-      <div className={cn("transition-opacity duration-300", isLoading && "opacity-30")}>
+      <div className={cn("transition-opacity duration-300", isLoading && "opacity-20")}>
         <div className="flex flex-col items-center mb-8 mt-4">
           <h1 className="text-2xl font-bold text-white tracking-tight" style={{ letterSpacing: "-0.02em" }}>Trans KP</h1>
         </div>
@@ -223,29 +326,25 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Inline keyframe styles */}
+      {/* Keyframe styles */}
       <style jsx>{`
-        @keyframes indeterminate-progress {
-          0% {
-            transform: translateX(-100%);
-          }
-          50% {
-            transform: translateX(100%);
-          }
-          100% {
-            transform: translateX(250%);
-          }
+        @keyframes slideUpFade {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes overlayFadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes shine {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
         }
         @keyframes spinner-rotate {
-          from {
-            transform: rotate(0deg);
-          }
-          to {
-            transform: rotate(360deg);
-          }
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
       `}</style>
     </div>
   );
 }
-
