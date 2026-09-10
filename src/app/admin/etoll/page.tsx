@@ -293,6 +293,7 @@ export default function EtollPage() {
             if (data.found && data.card) {
               toast.success("Kartu ditemukan!", { description: `${data.card.name} — ${data.card.card_number}` });
               setSelectedCard(data.card);
+              setSearch(data.card.card_number);
             } else {
               // Card not registered with this NFC UID
               toast.info("NFC belum terdaftar", { 
@@ -308,10 +309,19 @@ export default function EtollPage() {
         }
       }, { signal: abortController.signal });
 
-      ndef.addEventListener("readingerror", () => {
-        toast.success("Kartu terdeteksi!", { 
-          description: "Silakan ketik nomor kartu di kolom pencarian." 
-        });
+      ndef.addEventListener("readingerror", (event: any) => {
+        const sn = event.serialNumber;
+        if (sn) {
+          // Jika entah bagaimana serialNumber tersedia di object error
+          setSearch(sn);
+          toast.success("Kartu terdeteksi!", { 
+            description: `UID: ${sn} telah dimasukkan ke pencarian.` 
+          });
+        } else {
+          toast.error("Format Kartu Tidak Didukung", { 
+            description: "Browser tidak dapat membaca UID dari kartu ini (biasanya karena jenis Mifare Classic). Silakan ketik nomor secara manual." 
+          });
+        }
         setTimeout(() => searchInputRef.current?.focus(), 100);
         stopNFCScan();
       }, { signal: abortController.signal });
