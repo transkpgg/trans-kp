@@ -240,7 +240,7 @@ class _WebViewPageState extends State<WebViewPage> {
         ),
       )
       ..loadRequest(
-        Uri.parse('https://trans-kp-vdnh-8copoleiz-transkpggs-projects.vercel.app'),
+        Uri.parse('https://trans-kp-app.vercel.app'),
       );
 
     if (controller.platform is AndroidWebViewController) {
