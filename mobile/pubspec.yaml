@@ -36,6 +36,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   webview_flutter: ^4.14.1
   permission_handler: ^13.0.2
+  flutter_nfc_kit: ^3.6.2
 
 dev_dependencies:
   flutter_test:

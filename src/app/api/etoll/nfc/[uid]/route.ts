@@ -29,9 +29,17 @@ export async function GET(
     if (!user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
     const { uid } = await params;
+    const cleanUid = uid.replace(/[:\s-]/g, '');
     
-    const card = await prisma.etollCard.findUnique({
-      where: { nfc_uid: uid },
+    const card = await prisma.etollCard.findFirst({
+      where: {
+        OR: [
+          { nfc_uid: uid },
+          { nfc_uid: cleanUid },
+          { nfc_uid: cleanUid.toLowerCase() },
+          { nfc_uid: cleanUid.toUpperCase() },
+        ]
+      },
       include: {
         histories: {
           include: { user: { select: { full_name: true } } },

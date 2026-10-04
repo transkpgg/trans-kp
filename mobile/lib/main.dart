@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_nfc_kit/flutter_nfc_kit.dart';
 
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
@@ -225,6 +226,46 @@ class _WebViewPageState extends State<WebViewPage> {
     controller
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0xFF0B0F19))
+      ..addJavaScriptChannel(
+        'FlutterNFCChannel',
+        onMessageReceived: (JavaScriptMessage message) async {
+          if (message.message == 'scan') {
+            try {
+              var availability = await FlutterNfcKit.nfcAvailability;
+              if (availability != NFCAvailability.available) {
+                controller.runJavaScript(
+                  "if (window.onFlutterNFCError) window.onFlutterNFCError('NFC tidak aktif atau tidak didukung di perangkat ini.');",
+                );
+                return;
+              }
+
+              var tag = await FlutterNfcKit.poll(
+                timeout: const Duration(seconds: 30),
+                iosMultipleTagMessage: "Multiple tags found!",
+                iosAlertMessage: "Hold card near device",
+              );
+
+              String uid = tag.id;
+              await FlutterNfcKit.finish();
+
+              controller.runJavaScript(
+                "if (window.onFlutterNFCResult) window.onFlutterNFCResult('$uid');",
+              );
+            } catch (e) {
+              await FlutterNfcKit.finish().catchError((_) {});
+              String errMessage = e.toString().replaceAll("'", "\\'").replaceAll("\n", " ");
+              controller.runJavaScript(
+                "if (window.onFlutterNFCError) window.onFlutterNFCError('$errMessage');",
+              );
+            }
+          } else if (message.message == 'stop') {
+            try {
+              await FlutterNfcKit.finish();
+            } catch (_) {}
+          }
+        },
+      )
+      ..setUserAgent("TransKPApp/1.0 Mobile")
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (String url) {
@@ -233,6 +274,7 @@ class _WebViewPageState extends State<WebViewPage> {
             });
           },
           onPageFinished: (String url) {
+            controller.runJavaScript("window.isFlutterApp = true;");
             setState(() {
               _isLoading = false;
             });

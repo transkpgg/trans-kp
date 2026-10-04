@@ -208,6 +208,13 @@ export default function EtollPage() {
       nfcAbortControllerRef.current.abort();
       nfcAbortControllerRef.current = null;
     }
+    if (typeof window !== "undefined" && (window as any).FlutterNFCChannel) {
+      try {
+        (window as any).FlutterNFCChannel.postMessage("stop");
+      } catch (e) {}
+      delete (window as any).onFlutterNFCResult;
+      delete (window as any).onFlutterNFCError;
+    }
     nfcReaderRef.current = null;
     setIsScanningNFC(false);
     setNfcMode("search");
@@ -221,11 +228,64 @@ export default function EtollPage() {
     };
   }, [stopNFCScan]);
 
+  const handleTagScanned = async (sn: string, mode: "search" | "register", cardIdForRegister?: string) => {
+    if (!sn) {
+      toast.error("Tidak dapat membaca Serial Number / UID kartu.");
+      stopNFCScan();
+      return;
+    }
+
+    if (mode === "register" && cardIdForRegister) {
+      try {
+        const res = await fetch(`/api/etoll/${cardIdForRegister}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "register_nfc", nfc_uid: sn })
+        });
+        if (res.ok) {
+          toast.success("NFC berhasil didaftarkan!", { description: `UID: ${sn}` });
+          mutate();
+        } else {
+          const data = await res.json();
+          toast.error(data.message || "Gagal mendaftarkan NFC");
+        }
+      } catch (e) {
+        toast.error("Terjadi kesalahan jaringan");
+      }
+      stopNFCScan();
+    } else {
+      try {
+        const res = await fetch(`/api/etoll/nfc/${encodeURIComponent(sn)}`);
+        const data = await res.json();
+        if (data.found && data.card) {
+          toast.success("Kartu ditemukan!", { description: `${data.card.name} — ${data.card.card_number}` });
+          setSelectedCard(data.card);
+          setSearch(data.card.card_number);
+        } else {
+          toast.info("NFC belum terdaftar", { 
+            description: `UID: ${sn} — Daftarkan NFC di detail kartu terlebih dahulu.`
+          });
+          setSearch(sn);
+        }
+      } catch (e) {
+        toast.error("Gagal mencari kartu");
+        setSearch(sn);
+      }
+      stopNFCScan();
+    }
+  };
+
   // Core NFC scan function that handles both "search" and "register" modes
   const startNFCScan = async (mode: "search" | "register", cardIdForRegister?: string) => {
-    if (!('NDEFReader' in window)) {
-      toast.error("NFC tidak didukung", {
-        description: "Gunakan Chrome di Android untuk fitur NFC."
+    const isFlutter = typeof window !== "undefined" && (
+      !!(window as any).FlutterNFCChannel || 
+      !!(window as any).isFlutterApp || 
+      (typeof navigator !== "undefined" && navigator.userAgent.includes("TransKPApp"))
+    );
+
+    if (!isFlutter) {
+      toast.info("NFC Khusus Aplikasi Android", {
+        description: "Fitur scan NFC hanya dapat digunakan melalui Aplikasi Android Trans KP."
       });
       return;
     }
@@ -243,101 +303,38 @@ export default function EtollPage() {
       setNfcMode(mode);
       if (cardIdForRegister) setNfcRegisterCardId(cardIdForRegister);
 
-      const abortController = new AbortController();
-      nfcAbortControllerRef.current = abortController;
-
-      // @ts-ignore
-      const ndef = new window.NDEFReader();
-      nfcReaderRef.current = ndef;
-
-      await ndef.scan({ signal: abortController.signal });
-
       toast.info("NFC Aktif", { 
         description: mode === "register" 
-          ? "Tempelkan kartu E-Toll untuk mendaftarkan NFC-nya." 
-          : "Tempelkan kartu E-Toll untuk mencari datanya." 
+          ? "Tempelkan kartu E-Toll pada HP untuk mendaftarkan NFC." 
+          : "Tempelkan kartu E-Toll pada HP untuk mencari datanya." 
       });
 
-      ndef.addEventListener("reading", async ({ serialNumber }: any) => {
-        const sn = serialNumber || "";
-        if (!sn) {
-          toast.error("Tidak dapat membaca Serial Number kartu.");
-          stopNFCScan();
-          return;
-        }
-
-        if (mode === "register" && cardIdForRegister) {
-          // REGISTER MODE: Save NFC UID to the card
-          try {
-            const res = await fetch(`/api/etoll/${cardIdForRegister}`, {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ action: "register_nfc", nfc_uid: sn })
-            });
-            if (res.ok) {
-              toast.success("NFC berhasil didaftarkan!", { description: `UID: ${sn}` });
-              mutate();
-            } else {
-              const data = await res.json();
-              toast.error(data.message || "Gagal mendaftarkan NFC");
-            }
-          } catch (e) {
-            toast.error("Terjadi kesalahan jaringan");
+      if ((window as any).FlutterNFCChannel) {
+        (window as any).onFlutterNFCResult = (uid: string) => {
+          handleTagScanned(uid, mode, cardIdForRegister);
+        };
+        (window as any).onFlutterNFCError = (err: string) => {
+          if (!err.toLowerCase().includes("user canceled") && !err.toLowerCase().includes("session timeout")) {
+            toast.error("NFC Error", { description: err });
           }
           stopNFCScan();
-        } else {
-          // SEARCH MODE: Look up card by NFC UID
-          try {
-            const res = await fetch(`/api/etoll/nfc/${encodeURIComponent(sn)}`);
-            const data = await res.json();
-            if (data.found && data.card) {
-              toast.success("Kartu ditemukan!", { description: `${data.card.name} — ${data.card.card_number}` });
-              setSelectedCard(data.card);
-              setSearch(data.card.card_number);
-            } else {
-              // Card not registered with this NFC UID
-              toast.info("NFC belum terdaftar", { 
-                description: `UID: ${sn} — Daftarkan NFC di detail kartu terlebih dahulu.`
-              });
-              setSearch(sn);
-            }
-          } catch (e) {
-            toast.error("Gagal mencari kartu");
-            setSearch(sn);
-          }
+        };
+        (window as any).FlutterNFCChannel.postMessage("scan");
+
+        nfcTimeoutRef.current = setTimeout(() => {
           stopNFCScan();
-        }
-      }, { signal: abortController.signal });
-
-      ndef.addEventListener("readingerror", (event: any) => {
-        const sn = event.serialNumber;
-        if (sn) {
-          // Jika entah bagaimana serialNumber tersedia di object error
-          setSearch(sn);
-          toast.success("Kartu terdeteksi!", { 
-            description: `UID: ${sn} telah dimasukkan ke pencarian.` 
-          });
-        } else {
-          toast.error("Format Kartu Tidak Didukung", { 
-            description: "Browser tidak dapat membaca UID dari kartu ini (biasanya karena jenis Mifare Classic). Silakan ketik nomor secara manual." 
-          });
-        }
-        setTimeout(() => searchInputRef.current?.focus(), 100);
+          toast.info("Scan NFC timeout", { description: "Silakan coba lagi." });
+        }, 30000);
+      } else {
+        toast.error("Bridge NFC Belum Siap", {
+          description: "Silakan muat ulang halaman pada Aplikasi Android Trans KP."
+        });
         stopNFCScan();
-      }, { signal: abortController.signal });
-
-      // Auto-stop after 30 seconds
-      nfcTimeoutRef.current = setTimeout(() => {
-        stopNFCScan();
-        toast.info("Scan NFC timeout", { description: "Silakan coba lagi." });
-      }, 30000);
+      }
 
     } catch (error: any) {
       console.error("NFC Scan Error:", error);
-      if (error?.name === 'AbortError') return;
-      toast.error("NFC gagal diaktifkan", { 
-        description: error?.message || "Pastikan NFC aktif di pengaturan HP." 
-      });
+      toast.error("Gagal Memulai NFC", { description: error?.message || "Terjadi kesalahan pada modul NFC." });
       stopNFCScan();
     }
   };
