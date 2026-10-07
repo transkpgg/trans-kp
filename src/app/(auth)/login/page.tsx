@@ -120,7 +120,6 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        localStorage.removeItem("transkp_remembered_credentials");
         throw new Error(data.message || "Gagal login");
       }
 
@@ -158,15 +157,14 @@ export default function LoginPage() {
           }
         }
 
-        // 2. If not authenticated, check remembered credentials in localStorage
+        // 2. If not authenticated, restore remembered credentials into inputs (user presses Masuk manually)
         const saved = localStorage.getItem("transkp_remembered_credentials");
         if (saved) {
           const { username: u, password: p, rememberMe: r } = JSON.parse(saved);
-          if (u && p && r && isMounted) {
+          if (u && isMounted) {
             setUsername(u);
-            setPassword(p);
-            setRememberMe(true);
-            executeLogin(u, p, true);
+            setPassword(p || "");
+            setRememberMe(!!r);
           }
         }
       } catch (e) {
