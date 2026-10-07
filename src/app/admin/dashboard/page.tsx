@@ -130,9 +130,6 @@ export default function AdminDashboardPage() {
           );
         })}
       </div>
-          );
-        })}
-      </div>
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
