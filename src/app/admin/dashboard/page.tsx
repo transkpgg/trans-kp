@@ -1,6 +1,7 @@
 "use client";
 
-import { Users, Building2, CreditCard, Car } from "lucide-react";
+import { Users, Building2, CreditCard, Car, Receipt } from "lucide-react";
+import Link from "next/link";
 import { formatTime, cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
@@ -16,10 +17,12 @@ export default function AdminDashboardPage() {
   const { data: usersData } = useSWR("/api/users", fetcher);
   const { data: hotelData } = useSWR("/api/hotel-visits", fetcher);
   const { data: etollData } = useSWR("/api/etoll", fetcher);
+  const { data: bonData } = useSWR("/api/driver-bon", fetcher);
 
   const users = Array.isArray(usersData) ? usersData : [];
   const hotelVisits = Array.isArray(hotelData) ? hotelData : [];
   const etollCards = Array.isArray(etollData) ? etollData : [];
+  const driverBons = Array.isArray(bonData) ? bonData : [];
 
   const driverCount = users.filter((u: any) => u.role === "karyawan").length;
   const hotelVisitsThisMonth = hotelVisits.length;
@@ -27,6 +30,7 @@ export default function AdminDashboardPage() {
   const cardsInUse = etollCards.filter((c: any) => c.status === "in_use").length;
   const cardsAvailable = etollCards.filter((c: any) => c.status === "available" || c.status === "returned").length;
   const cardsLost = etollCards.filter((c: any) => c.status === "lost").length;
+  const totalBonsCount = driverBons.length;
 
   // Hotel visit status breakdown
   const hotelSelesai = hotelVisits.filter((v: any) => v.check_out_time).length;
@@ -58,10 +62,10 @@ export default function AdminDashboardPage() {
   const driverBarColors = ["#6366f1", "#8b5cf6", "#a78bfa", "#c4b5fd", "#818cf8", "#7c3aed"];
 
   const stats = [
-    { label: "Total Pengemudi", value: driverCount, icon: Users, color: "brand", trend: "Aktif bulan ini" },
-    { label: "Kunjungan Hotel", value: hotelVisitsThisMonth, icon: Building2, color: "emerald", trend: "Total bulan ini" },
-    { label: "Total Kartu E-Toll", value: totalCards, icon: CreditCard, color: "amber", trend: "Kartu terdaftar" },
-    { label: "E-Toll Dipakai", value: cardsInUse, icon: Car, color: "red", trend: "Sedang dipinjam" },
+    { label: "Total Pengemudi", value: driverCount, icon: Users, color: "brand", href: "/admin/users" },
+    { label: "Kunjungan Hotel", value: hotelVisitsThisMonth, icon: Building2, color: "emerald", href: "/admin/hotel-visits" },
+    { label: "Bon Pengemudi", value: totalBonsCount, icon: Receipt, color: "purple", href: "/admin/bon-pengemudi" },
+    { label: "Total E-Toll", value: totalCards, icon: CreditCard, color: "amber", href: "/admin/etoll" },
   ];
 
   const recentHotels = [...hotelVisits].sort((a: any, b: any) => new Date(b.check_in_time).getTime() - new Date(a.check_in_time).getTime()).slice(0, 5);
@@ -87,14 +91,15 @@ export default function AdminDashboardPage() {
         {stats.map((stat, i) => {
           const Icon = stat.icon;
           return (
-            <div 
+            <Link 
               key={stat.label} 
+              href={stat.href}
               className={cn(
-                "glass-card p-5 relative overflow-hidden group slide-up",
+                "glass-card p-5 relative overflow-hidden group slide-up cursor-pointer hover:border-brand-500/50 transition-all",
                 stat.color === 'brand' && "border-l-4 border-l-brand-500",
                 stat.color === 'emerald' && "border-l-4 border-l-emerald-500",
-                stat.color === 'amber' && "border-l-4 border-l-amber-500",
-                stat.color === 'red' && "border-l-4 border-l-red-500"
+                stat.color === 'purple' && "border-l-4 border-l-purple-500",
+                stat.color === 'amber' && "border-l-4 border-l-amber-500"
               )}
               style={{ animationDelay: `${i * 0.1}s` }}
             >
@@ -102,14 +107,14 @@ export default function AdminDashboardPage() {
                 <div>
                   <p className="text-xs text-surface-400 uppercase tracking-wider font-semibold mb-1">{stat.label}</p>
                   <p className="text-3xl font-bold text-white tracking-tight">{stat.value}</p>
-                  <p className="text-xs text-surface-500 mt-2">{stat.trend}</p>
+                  <p className="text-xs text-brand-400 mt-2 font-medium">Buka Menu &rarr;</p>
                 </div>
                 <div className={cn(
                   "p-3 rounded-xl",
                   stat.color === 'brand' && "bg-brand-500/10 text-brand-400",
                   stat.color === 'emerald' && "bg-emerald-500/10 text-emerald-400",
-                  stat.color === 'amber' && "bg-amber-500/10 text-amber-400",
-                  stat.color === 'red' && "bg-red-500/10 text-red-400"
+                  stat.color === 'purple' && "bg-purple-500/10 text-purple-400",
+                  stat.color === 'amber' && "bg-amber-500/10 text-amber-400"
                 )}>
                   <Icon className="w-6 h-6" />
                 </div>
@@ -118,10 +123,13 @@ export default function AdminDashboardPage() {
                 "absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500 bg-gradient-to-br from-transparent to-current",
                 stat.color === 'brand' && "text-brand-500",
                 stat.color === 'emerald' && "text-emerald-500",
-                stat.color === 'amber' && "text-amber-500",
-                stat.color === 'red' && "text-red-500"
+                stat.color === 'purple' && "text-purple-500",
+                stat.color === 'amber' && "text-amber-500"
               )} />
-            </div>
+            </Link>
+          );
+        })}
+      </div>
           );
         })}
       </div>

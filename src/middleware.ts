@@ -15,6 +15,7 @@ export async function middleware(request: NextRequest) {
                           path.startsWith('/home') || 
                           path.startsWith('/profile') || 
                           path.startsWith('/hotel-visit') || 
+                          path.startsWith('/bon-pengemudi') || 
                           path.startsWith('/history');
 
   if (isProtectedPath) {
@@ -61,6 +62,7 @@ export const config = {
     '/home',
     '/profile',
     '/hotel-visit/:path*',
+    '/bon-pengemudi/:path*',
     '/history',
     '/login'
   ]
