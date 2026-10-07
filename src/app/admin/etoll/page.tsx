@@ -282,10 +282,11 @@ export default function EtollPage() {
       !!(window as any).isFlutterApp || 
       (typeof navigator !== "undefined" && navigator.userAgent.includes("TransKPApp"))
     );
+    const hasWebNFC = typeof window !== "undefined" && "NDEFReader" in window;
 
-    if (!isFlutter) {
-      toast.info("NFC Khusus Aplikasi Android", {
-        description: "Fitur scan NFC hanya dapat digunakan melalui Aplikasi Android Trans KP."
+    if (!isFlutter && !hasWebNFC) {
+      toast.info("Fitur NFC Membutuhkan Akses NFC Hardware", {
+        description: "Gunakan HP dengan NFC melalui Aplikasi Android Trans KP atau Browser Mobile Chrome yang mendukung NFC."
       });
       return;
     }
@@ -341,6 +342,33 @@ export default function EtollPage() {
           stopNFCScan();
           toast.info("Scan NFC timeout", { description: "Silakan coba lagi." });
         }, 30000);
+      } else if (hasWebNFC) {
+        try {
+          const controller = new AbortController();
+          nfcAbortControllerRef.current = controller;
+          const ndef = new (window as any).NDEFReader();
+          await ndef.scan({ signal: controller.signal });
+          
+          ndef.onreading = (event: any) => {
+            const serialNumber = event.serialNumber || (event.message?.records?.[0] ? "CARD_" + Date.now() : null);
+            if (serialNumber) {
+              const formattedSn = serialNumber.replace(/:/g, "").toUpperCase();
+              handleTagScanned(formattedSn, mode, cardIdForRegister);
+            }
+          };
+
+          ndef.onreadingerror = () => {
+            toast.error("Gagal membaca kartu NFC Web");
+          };
+
+          nfcTimeoutRef.current = setTimeout(() => {
+            stopNFCScan();
+            toast.info("Scan NFC timeout", { description: "Silakan coba lagi." });
+          }, 30000);
+        } catch (webNfcErr: any) {
+          toast.error("Gagal Memulai Web NFC", { description: webNfcErr?.message || "Pastikan izin NFC diaktifkan di browser." });
+          stopNFCScan();
+        }
       } else {
         toast.error("Bridge NFC Belum Siap", {
           description: "Silakan muat ulang halaman pada Aplikasi Android Trans KP."
