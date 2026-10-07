@@ -234,24 +234,40 @@ class _WebViewPageState extends State<WebViewPage> {
         onMessageReceived: (JavaScriptMessage message) async {
           if (message.message == 'scan') {
             try {
-              var availability = await FlutterNfcKit.nfcAvailability;
-              if (availability != NFCAvailability.available) {
-                // Check native state for accuracy
-                try {
-                  final String? state = await _nfcChannel.invokeMethod<String>('nfcState');
-                  if (state == 'disabled') {
-                    controller.runJavaScript(
-                      "if (window.onFlutterNFCError) window.onFlutterNFCError('NFC_DISABLED');",
-                    );
-                    return;
-                  }
-                } catch (_) {}
+              // 1. Check native Android NFC state first for maximum accuracy
+              String nfcState = 'available';
+              try {
+                final String? state = await _nfcChannel.invokeMethod<String>('nfcState');
+                if (state != null) nfcState = state;
+              } catch (_) {}
 
+              if (nfcState == 'not_supported') {
                 controller.runJavaScript(
-                  "if (window.onFlutterNFCError) window.onFlutterNFCError('NFC tidak aktif atau tidak didukung pada perangkat ini.');",
+                  "if (window.onFlutterNFCError) window.onFlutterNFCError('NFC_NOT_SUPPORTED');",
+                );
+                return;
+              } else if (nfcState == 'disabled') {
+                controller.runJavaScript(
+                  "if (window.onFlutterNFCError) window.onFlutterNFCError('NFC_DISABLED');",
                 );
                 return;
               }
+
+              // Also check FlutterNfcKit availability as fallback
+              try {
+                var availability = await FlutterNfcKit.nfcAvailability;
+                if (availability == NFCAvailability.disabled) {
+                  controller.runJavaScript(
+                    "if (window.onFlutterNFCError) window.onFlutterNFCError('NFC_DISABLED');",
+                  );
+                  return;
+                } else if (availability == NFCAvailability.not_supported) {
+                  controller.runJavaScript(
+                    "if (window.onFlutterNFCError) window.onFlutterNFCError('NFC_NOT_SUPPORTED');",
+                  );
+                  return;
+                }
+              } catch (_) {}
 
               // End any active session first
               try {
@@ -273,9 +289,13 @@ class _WebViewPageState extends State<WebViewPage> {
             } catch (e) {
               await FlutterNfcKit.finish().catchError((_) {});
               String errStr = e.toString();
-              if (errStr.contains("404") || errStr.contains("NDEFReader") || errStr.contains("not supported")) {
+              if (errStr.contains("disabled") || errStr.contains("off") || errStr.contains("404") || errStr.contains("NDEFReader")) {
                 controller.runJavaScript(
                   "if (window.onFlutterNFCError) window.onFlutterNFCError('NFC_DISABLED');",
+                );
+              } else if (errStr.contains("not_supported") || errStr.contains("no nfc")) {
+                controller.runJavaScript(
+                  "if (window.onFlutterNFCError) window.onFlutterNFCError('NFC_NOT_SUPPORTED');",
                 );
               } else {
                 String errMessage = errStr.replaceAll("'", "\\'").replaceAll("\n", " ");

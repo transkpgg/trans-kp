@@ -315,8 +315,8 @@ export default function EtollPage() {
         };
         (window as any).onFlutterNFCError = (err: string) => {
           if (err === "NFC_DISABLED") {
-            toast.error("NFC Belum Aktif", {
-              description: "NFC belum diaktifkan di HP Anda. Silakan aktifkan terlebih dahulu.",
+            toast.error("NFC Belum Aktif di HP", {
+              description: "Fitur NFC di HP Anda masih OFF. Silakan aktifkan di Pengaturan.",
               action: {
                 label: "Buka Pengaturan",
                 onClick: () => {
@@ -325,6 +325,10 @@ export default function EtollPage() {
                   }
                 }
               }
+            });
+          } else if (err === "NFC_NOT_SUPPORTED") {
+            toast.error("NFC Tidak Didukung Perangkat", {
+              description: "HP ini tidak memiliki chip hardware NFC fisik."
             });
           } else if (!err.toLowerCase().includes("user canceled") && !err.toLowerCase().includes("session timeout")) {
             toast.error("NFC Error", { description: err });
