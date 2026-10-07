@@ -44,6 +44,7 @@ export default function EmployeeBonPengemudiPage() {
   const [search, setSearch] = useState("");
   const [startDateFilter, setStartDateFilter] = useState("");
   const [endDateFilter, setEndDateFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "lunas" | "belum_lunas">("all");
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -61,6 +62,7 @@ export default function EmployeeBonPengemudiPage() {
   const [departureDate, setDepartureDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [nominalDisplay, setNominalDisplay] = useState("");
   const [keterangan, setKeterangan] = useState("Pergi Pulang");
+  const [status, setStatus] = useState("belum_lunas");
   const [signatureUrl, setSignatureUrl] = useState("");
   const [showSignaturePad, setShowSignaturePad] = useState(false);
   const [viewingSignatureUrl, setViewingSignatureUrl] = useState<string | null>(null);
@@ -105,13 +107,26 @@ export default function EmployeeBonPengemudiPage() {
       const matchStart = !startDateFilter || bDate >= startDateFilter;
       const matchEnd = !endDateFilter || bDate <= endDateFilter;
 
-      return matchSearch && matchStart && matchEnd;
+      const matchStatus =
+        statusFilter === "all" ||
+        (statusFilter === "lunas" && b.status === "lunas") ||
+        (statusFilter === "belum_lunas" && b.status !== "lunas");
+
+      return matchSearch && matchStart && matchEnd && matchStatus;
     });
-  }, [bons, search, startDateFilter, endDateFilter]);
+  }, [bons, search, startDateFilter, endDateFilter, statusFilter]);
 
   // Summary Metrics
   const totalNominal = useMemo(() => {
     return filteredBons.reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
+  }, [filteredBons]);
+
+  const totalNominalLunas = useMemo(() => {
+    return filteredBons.filter((b: any) => b.status === "lunas").reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
+  }, [filteredBons]);
+
+  const totalNominalBelumLunas = useMemo(() => {
+    return filteredBons.filter((b: any) => b.status !== "lunas").reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
   }, [filteredBons]);
 
   const openCreateModal = () => {
@@ -135,6 +150,7 @@ export default function EmployeeBonPengemudiPage() {
     setDepartureDate(format(new Date(), "yyyy-MM-dd"));
     setNominalDisplay("");
     setKeterangan("Pergi Pulang");
+    setStatus("belum_lunas");
     setSignatureUrl("");
     setShowSignaturePad(false);
     setIsModalOpen(true);
@@ -153,9 +169,29 @@ export default function EmployeeBonPengemudiPage() {
     setDepartureDate(bon.departure_date ? format(new Date(bon.departure_date), "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd"));
     setNominalDisplay(formatCurrencyInput(bon.amount || 0));
     setKeterangan(bon.keterangan || "Pergi Pulang");
+    setStatus(bon.status || "belum_lunas");
     setSignatureUrl(bon.signature_url || "");
     setShowSignaturePad(!!bon.signature_url);
     setIsModalOpen(true);
+  };
+
+  const handleToggleStatus = async (bonId: string, currentStatus: string) => {
+    const newStatus = currentStatus === "lunas" ? "belum_lunas" : "lunas";
+    try {
+      const res = await fetch(`/api/driver-bon/${bonId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (res.ok) {
+        toast.success(`Status pembayaran diubah ke ${newStatus === "lunas" ? "LUNAS 🟢" : "BELUM LUNAS 🔴"}`);
+        mutateBons();
+      } else {
+        toast.error("Gagal memperbarui status");
+      }
+    } catch (e) {
+      toast.error("Kesalahan jaringan");
+    }
   };
 
   const handleDriverSelect = (userObj: any) => {
@@ -204,6 +240,7 @@ export default function EmployeeBonPengemudiPage() {
       departure_date: departureDate,
       amount: numericAmount,
       keterangan,
+      status,
       signature_url: signatureUrl || null,
     };
 
@@ -265,7 +302,8 @@ export default function EmployeeBonPengemudiPage() {
         "Tanggal berangkat": bon.departure_date ? format(new Date(bon.departure_date), "dd/MM/yyyy") : "-",
         "Nominal Pengemudi": formatRupiah(bon.amount || 0).replace("Rp ", ""),
         "Keterangan": bon.keterangan || "-",
-        "TTD": bon.signature_url ? "Ada TTD" : "Ada"
+        "Status Pembayaran": bon.status === "lunas" ? "Lunas" : "Belum Lunas",
+        "TTD": bon.signature_url ? "Ada TTD" : "Belum TTD"
       }));
 
       const ws = XLSX.utils.json_to_sheet(excelData);
@@ -331,7 +369,7 @@ export default function EmployeeBonPengemudiPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="glass-card p-5 border border-white/5 rounded-2xl flex items-center justify-between">
           <div>
             <p className="text-xs text-surface-400 font-medium uppercase tracking-wider">Total Bon Transaksi</p>
@@ -344,26 +382,74 @@ export default function EmployeeBonPengemudiPage() {
 
         <div className="glass-card p-5 border border-white/5 rounded-2xl flex items-center justify-between">
           <div>
-            <p className="text-xs text-surface-400 font-medium uppercase tracking-wider">Total Nominal Bon</p>
-            <h3 className="text-2xl font-bold text-emerald-400 mt-1">{formatRupiah(totalNominal)}</h3>
+            <p className="text-xs text-surface-400 font-medium uppercase tracking-wider">Total Nominal Lunas 🟢</p>
+            <h3 className="text-2xl font-bold text-emerald-400 mt-1">{formatRupiah(totalNominalLunas)}</h3>
           </div>
           <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-            <DollarSign className="h-6 w-6 text-emerald-400" />
+            <CheckCircle2 className="h-6 w-6 text-emerald-400" />
+          </div>
+        </div>
+
+        <div className="glass-card p-5 border border-white/5 rounded-2xl flex items-center justify-between">
+          <div>
+            <p className="text-xs text-surface-400 font-medium uppercase tracking-wider">Belum Lunas 🔴</p>
+            <h3 className="text-2xl font-bold text-amber-400 mt-1">{formatRupiah(totalNominalBelumLunas)}</h3>
+          </div>
+          <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+            <DollarSign className="h-6 w-6 text-amber-400" />
           </div>
         </div>
       </div>
 
       {/* Search & Filter Bar */}
       <div className="glass-card p-4 rounded-2xl border border-white/5 space-y-3">
-        <div className="relative w-full">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-500" />
-          <input
-            type="text"
-            placeholder="Cari Nopol, Pengemudi, No SPD, atau Tujuan..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-surface-900/60 border border-surface-700 text-white rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-          />
+        <div className="flex flex-col md:flex-row items-center gap-3">
+          <div className="relative flex-1 w-full">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-500" />
+            <input
+              type="text"
+              placeholder="Cari Nopol, Pengemudi, No SPD, atau Tujuan..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-surface-900/60 border border-surface-700 text-white rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+            />
+          </div>
+
+          {/* Quick Status Filter Tabs */}
+          <div className="flex items-center gap-1.5 p-1 bg-surface-900/80 border border-surface-800 rounded-xl w-full md:w-auto">
+            <button
+              onClick={() => setStatusFilter("all")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                statusFilter === "all"
+                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                  : "text-surface-400 hover:text-white"
+              }`}
+            >
+              Semua Status
+            </button>
+            <button
+              onClick={() => setStatusFilter("lunas")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1 ${
+                statusFilter === "lunas"
+                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                  : "text-surface-400 hover:text-white"
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              Lunas
+            </button>
+            <button
+              onClick={() => setStatusFilter("belum_lunas")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1 ${
+                statusFilter === "belum_lunas"
+                  ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                  : "text-surface-400 hover:text-white"
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-amber-400" />
+              Belum Lunas
+            </button>
+          </div>
         </div>
       </div>
 
@@ -382,6 +468,7 @@ export default function EmployeeBonPengemudiPage() {
                 <th className="py-3.5 px-4 font-semibold">Tgl Berangkat</th>
                 <th className="py-3.5 px-4 font-semibold text-right">Nominal</th>
                 <th className="py-3.5 px-4 font-semibold">Keterangan</th>
+                <th className="py-3.5 px-4 font-semibold text-center">Status</th>
                 <th className="py-3.5 px-4 font-semibold text-center">TTD</th>
                 <th className="py-3.5 px-4 font-semibold text-center">Aksi</th>
               </tr>
@@ -389,13 +476,13 @@ export default function EmployeeBonPengemudiPage() {
             <tbody className="divide-y divide-surface-800/50">
               {isBonsLoading ? (
                 <tr>
-                  <td colSpan={11} className="text-center py-12 text-surface-500">
+                  <td colSpan={12} className="text-center py-12 text-surface-500">
                     Memuat data Bon Pengemudi...
                   </td>
                 </tr>
               ) : filteredBons.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="text-center py-12 text-surface-500">
+                  <td colSpan={12} className="text-center py-12 text-surface-500">
                     Belum ada data Bon Pengemudi
                   </td>
                 </tr>
@@ -440,6 +527,20 @@ export default function EmployeeBonPengemudiPage() {
                       >
                         {b.keterangan}
                       </span>
+                    </td>
+                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                      <button
+                        onClick={() => handleToggleStatus(b.id, b.status || "belum_lunas")}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
+                          b.status === "lunas"
+                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                            : "bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20"
+                        }`}
+                        title="Klik untuk ubah status pembayaran"
+                      >
+                        <span className={`w-2 h-2 rounded-full ${b.status === "lunas" ? "bg-emerald-400" : "bg-amber-400"}`} />
+                        {b.status === "lunas" ? "Lunas" : "Belum Lunas"}
+                      </button>
                     </td>
                     <td className="py-3.5 px-4 text-center whitespace-nowrap">
                       {b.signature_url ? (
@@ -685,22 +786,43 @@ export default function EmployeeBonPengemudiPage() {
                 </div>
               </div>
 
-              {/* Keterangan Dropdown */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wider text-surface-400">
-                  Keterangan Perjalanan <span className="text-red-400">*</span>
-                </label>
-                <select
-                  value={keterangan}
-                  onChange={(e) => setKeterangan(e.target.value)}
-                  className="w-full bg-surface-950 border border-surface-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-                >
-                  {KETERANGAN_OPTIONS.map((opt) => (
-                    <option key={opt} value={opt} className="bg-surface-900 text-white">
-                      {opt}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Keterangan Dropdown */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-surface-400">
+                    Keterangan Perjalanan <span className="text-red-400">*</span>
+                  </label>
+                  <select
+                    value={keterangan}
+                    onChange={(e) => setKeterangan(e.target.value)}
+                    className="w-full bg-surface-950 border border-surface-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  >
+                    {KETERANGAN_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt} className="bg-surface-900 text-white">
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Status Pembayaran */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-surface-400">
+                    Status Pembayaran <span className="text-red-400">*</span>
+                  </label>
+                  <select
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                    className="w-full bg-surface-950 border border-surface-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  >
+                    <option value="belum_lunas" className="bg-surface-900 text-amber-400">
+                      🔴 Belum Lunas
                     </option>
-                  ))}
-                </select>
+                    <option value="lunas" className="bg-surface-900 text-emerald-400">
+                      🟢 Lunas
+                    </option>
+                  </select>
+                </div>
               </div>
 
               {/* Tombol & Area Tanda Tangan Virtual (TTD) */}

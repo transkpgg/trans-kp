@@ -115,6 +115,7 @@ export async function POST(request: Request) {
         departure_date: new Date(departure_date),
         amount: parseFloat(amount),
         keterangan,
+        status: body.status || 'belum_lunas',
         signature_url: signature_url || null,
       },
       include: {

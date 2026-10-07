@@ -1,0 +1,9 @@
+/node_modules
+/.next
+/mobile
+/build
+.git
+Trans_KP.apk
+*.apk
+*.zip
+*.log

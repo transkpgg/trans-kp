@@ -136,6 +136,7 @@ model DriverBon {
   departure_date  DateTime
   amount          Float
   keterangan      String   // "Antar", "Jemput", "Pergi Pulang", "Inap"
+  status          String   @default("belum_lunas") // "lunas", "belum_lunas"
   signature_url   String?
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt

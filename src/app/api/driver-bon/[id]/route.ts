@@ -49,6 +49,7 @@ export async function PUT(
         ...(body.departure_date && { departure_date: new Date(body.departure_date) }),
         ...(body.amount !== undefined && { amount: parseFloat(body.amount) }),
         ...(body.keterangan && { keterangan: body.keterangan }),
+        ...(body.status && { status: body.status }),
         ...(body.signature_url !== undefined && { signature_url: body.signature_url }),
       }
     });
