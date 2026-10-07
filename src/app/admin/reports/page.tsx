@@ -30,9 +30,11 @@ export default function ReportsPage() {
   
   const { data: hotelData } = useSWR("/api/hotel-visits", fetcher);
   const { data: etollData } = useSWR("/api/etoll", fetcher);
+  const { data: bonData } = useSWR("/api/driver-bon", fetcher);
 
   const hotelVisits = Array.isArray(hotelData) ? hotelData : [];
   const etollCards = Array.isArray(etollData) ? etollData : [];
+  const bonList = Array.isArray(bonData) ? bonData : [];
 
   const exportToExcel = () => {
     try {
@@ -56,6 +58,20 @@ export default function ReportsPage() {
           "GPS Check In": (visit.check_in_lat && visit.check_in_lng) ? `https://maps.google.com/?q=${visit.check_in_lat},${visit.check_in_lng}` : "-",
           "Foto Check Out (URL)": visit.selfie_check_out_url || "-",
           "GPS Check Out": (visit.check_out_lat && visit.check_out_lng) ? `https://maps.google.com/?q=${visit.check_out_lat},${visit.check_out_lng}` : "-"
+        }));
+      } else if (reportType === "bon_pengemudi") {
+        filename = `Laporan_Bon_Pengemudi_${format(new Date(), "ddMMyyyy")}.xlsx`;
+        data = bonList.map((bon: any) => ({
+          "tanggal Bon Pengemudi": bon.bon_date ? safeFormat(bon.bon_date, "dd/MM/yyyy") : "-",
+          "Nopol": bon.nopol || "-",
+          "Nama Pengemudi": bon.driver_name || "-",
+          "NIK Pengemudi": bon.driver_nik || "-",
+          "Tujuan": bon.destination || "-",
+          "No SPD": bon.no_spd || "-",
+          "Tanggal berangkat": bon.departure_date ? safeFormat(bon.departure_date, "dd/MM/yyyy") : "-",
+          "Nominal Pengemudi": bon.amount ? Math.floor(bon.amount).toLocaleString("id-ID") : "0",
+          "Keterangan": bon.keterangan || "-",
+          "TTD": "Ada"
         }));
       } else {
         filename = `Laporan_EToll_${format(new Date(), "ddMMyyyy")}.xlsx`;
@@ -215,26 +231,36 @@ export default function ReportsPage() {
             <div className="space-y-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-surface-300">Jenis Laporan</label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <button 
                     onClick={() => setReportType("hotel")}
-                    className={`py-2 px-3 text-sm font-medium rounded-xl border transition-colors ${
+                    className={`py-2 px-2 text-xs font-medium rounded-xl border transition-colors ${
                       reportType === "hotel" 
                       ? "bg-brand-500/20 border-brand-500 text-brand-400" 
                       : "bg-surface-900 border-surface-700 text-surface-400 hover:bg-surface-800"
                     }`}
                   >
-                    Kunjungan Hotel
+                    Hotel Visit
                   </button>
                   <button 
                     onClick={() => setReportType("etoll")}
-                    className={`py-2 px-3 text-sm font-medium rounded-xl border transition-colors ${
+                    className={`py-2 px-2 text-xs font-medium rounded-xl border transition-colors ${
                       reportType === "etoll" 
                       ? "bg-brand-500/20 border-brand-500 text-brand-400" 
                       : "bg-surface-900 border-surface-700 text-surface-400 hover:bg-surface-800"
                     }`}
                   >
-                    Penggunaan E-Toll
+                    E-Toll
+                  </button>
+                  <button 
+                    onClick={() => setReportType("bon_pengemudi")}
+                    className={`py-2 px-2 text-xs font-medium rounded-xl border transition-colors ${
+                      reportType === "bon_pengemudi" 
+                      ? "bg-brand-500/20 border-brand-500 text-brand-400" 
+                      : "bg-surface-900 border-surface-700 text-surface-400 hover:bg-surface-800"
+                    }`}
+                  >
+                    Bon Pengemudi
                   </button>
                 </div>
               </div>

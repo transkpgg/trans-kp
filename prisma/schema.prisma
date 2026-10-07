@@ -27,6 +27,7 @@ model User {
   attendances  Attendance[]
   hotel_visits HotelVisit[]
   etoll_histories EtollHistory[]
+  driver_bons  DriverBon[]
 }
 
 model Branch {
@@ -121,4 +122,23 @@ model EtollHistory {
   amount_used    Float?
   timestamp      DateTime  @default(now())
   notes          String?
+}
+
+model DriverBon {
+  id              String   @id @default(cuid())
+  bon_date        DateTime @default(now())
+  nopol           String
+  driver_id       String?
+  driver_name     String
+  driver_nik      String
+  destination     String
+  no_spd          String
+  departure_date  DateTime
+  amount          Float
+  keterangan      String   // "Antar", "Jemput", "Pergi Pulang", "Inap"
+  signature_url   String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  driver          User?    @relation(fields: [driver_id], references: [id])
 }

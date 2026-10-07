@@ -11,6 +11,7 @@ import {
   Building2, 
   FileBarChart, 
   CreditCard,
+  Receipt,
   LogOut,
   Menu,
   X,
@@ -25,6 +26,7 @@ const adminNavItems = [
   { name: "Master User", href: "/admin/users", icon: Users },
   { name: "Hotel Visit", href: "/admin/hotel-visits", icon: Building2 },
   { name: "E-Toll", href: "/admin/etoll", icon: CreditCard },
+  { name: "Bon Pengemudi", href: "/admin/bon-pengemudi", icon: Receipt },
   { name: "Laporan", href: "/admin/reports", icon: FileBarChart },
 ];
 

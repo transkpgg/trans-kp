@@ -56,3 +56,22 @@ export function getInitials(name: string): string {
     .toUpperCase()
     .slice(0, 2);
 }
+
+export function formatRupiah(amount: number | string): string {
+  if (amount === undefined || amount === null || amount === "") return "Rp 0";
+  const num = typeof amount === "string" ? parseFloat(amount) : amount;
+  if (isNaN(num)) return "Rp 0";
+  return "Rp " + Math.floor(num).toLocaleString("id-ID");
+}
+
+export function formatCurrencyInput(value: string | number): string {
+  if (value === undefined || value === null || value === "") return "";
+  const numStr = value.toString().replace(/\D/g, "");
+  if (!numStr) return "";
+  return parseInt(numStr, 10).toLocaleString("id-ID");
+}
+
+export function parseCurrencyInput(value: string): number {
+  if (!value) return 0;
+  return parseInt(value.toString().replace(/\D/g, ""), 10) || 0;
+}
