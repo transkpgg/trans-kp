@@ -20,13 +20,16 @@ import {
   CheckCircle2, 
   ListFilter,
   Check,
-  ChevronDown
+  ChevronDown,
+  PenTool,
+  Eye
 } from "lucide-react";
 import useSWR from "swr";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { INDONESIA_CITIES } from "@/lib/indonesia-cities";
 import { formatRupiah, formatCurrencyInput, parseCurrencyInput } from "@/lib/utils";
+import { SignaturePad } from "@/components/ui/signature-pad";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -61,6 +64,8 @@ export default function BonPengemudiPage() {
   const [nominalDisplay, setNominalDisplay] = useState("");
   const [keterangan, setKeterangan] = useState("Pergi Pulang");
   const [signatureUrl, setSignatureUrl] = useState("");
+  const [showSignaturePad, setShowSignaturePad] = useState(false);
+  const [viewingSignatureUrl, setViewingSignatureUrl] = useState<string | null>(null);
 
   // Search dropdown helpers
   const [citySearch, setCitySearch] = useState("");
@@ -125,6 +130,7 @@ export default function BonPengemudiPage() {
     setNominalDisplay("");
     setKeterangan("Pergi Pulang");
     setSignatureUrl("");
+    setShowSignaturePad(false);
     setIsModalOpen(true);
   };
 
@@ -142,6 +148,7 @@ export default function BonPengemudiPage() {
     setNominalDisplay(formatCurrencyInput(bon.amount || 0));
     setKeterangan(bon.keterangan || "Pergi Pulang");
     setSignatureUrl(bon.signature_url || "");
+    setShowSignaturePad(!!bon.signature_url);
     setIsModalOpen(true);
   };
 
@@ -487,7 +494,17 @@ export default function BonPengemudiPage() {
                       </span>
                     </td>
                     <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                      <span className="text-xs text-emerald-400 font-medium">Ada TTD</span>
+                      {b.signature_url ? (
+                        <button
+                          onClick={() => setViewingSignatureUrl(b.signature_url)}
+                          className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-xs font-medium flex items-center gap-1.5 mx-auto transition-colors"
+                        >
+                          <PenTool className="h-3 w-3" />
+                          Ada TTD
+                        </button>
+                      ) : (
+                        <span className="text-xs text-surface-500 font-medium">Belum TTD</span>
+                      )}
                     </td>
                     <td className="py-3.5 px-4 text-center whitespace-nowrap">
                       <div className="flex items-center justify-center gap-1.5">
@@ -713,7 +730,7 @@ export default function BonPengemudiPage() {
                       value={nominalDisplay}
                       onChange={handleNominalChange}
                       required
-                      className="w-full bg-surface-950 border border-surface-700 rounded-xl pl-10 pr-3.5 py-2.5 text-sm font-bold text-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                      className="w-full bg-surface-950 border border-surface-700 rounded-xl pl-10 pr-3.5 py-2.5 text-sm font-bold text-emerald-400 focus:outline-none focus:ring-2 focus:ring-brand-500/50"
                     />
                   </div>
                   <p className="text-[10px] text-surface-500">Pemisah titik ribuan otomatis seperti aplikasi bank.</p>
@@ -738,6 +755,41 @@ export default function BonPengemudiPage() {
                 </select>
               </div>
 
+              {/* Tombol & Area Tanda Tangan Virtual (TTD) */}
+              <div className="space-y-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSignaturePad(!showSignaturePad)}
+                  className="w-full py-3 px-4 rounded-xl bg-surface-800 hover:bg-surface-700 text-brand-400 border border-brand-500/30 font-medium text-sm flex items-center justify-center gap-2 transition-all shadow-md group"
+                >
+                  <PenTool className="h-4 w-4 text-brand-400 group-hover:scale-110 transition-transform" />
+                  {showSignaturePad
+                    ? "Tutup Area Tanda Tangan (TTD)"
+                    : signatureUrl
+                    ? "✍️ Lihat / Ubah Tanda Tangan Virtual (TTD)"
+                    : "✍️ Klik untuk Buka Area Tanda Tangan (TTD Virtual)"}
+                </button>
+
+                {showSignaturePad && (
+                  <div className="p-4 bg-surface-950/80 border border-surface-800 rounded-xl space-y-3 animate-fadeIn">
+                    <SignaturePad
+                      value={signatureUrl}
+                      onChange={(dataUrl) => setSignatureUrl(dataUrl)}
+                    />
+                    {signatureUrl ? (
+                      <div className="flex items-center gap-2 text-xs text-emerald-400 font-medium pt-1">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                        Tanda tangan virtual tersimpan & siap dikirim.
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-surface-500">
+                        Coretkan tanda tangan pengemudi di kotak di atas.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {/* Submit Buttons */}
               <div className="pt-4 flex items-center justify-end gap-3 border-t border-surface-800">
                 <button
@@ -756,6 +808,40 @@ export default function BonPengemudiPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox Preview Signature Modal */}
+      {viewingSignatureUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="glass-card w-full max-w-md bg-surface-900 border border-surface-700 rounded-2xl p-6 shadow-2xl relative flex flex-col items-center space-y-4">
+            <button
+              onClick={() => setViewingSignatureUrl(null)}
+              className="absolute top-4 right-4 p-1.5 rounded-lg text-surface-400 hover:text-white hover:bg-surface-800 transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <PenTool className="h-5 w-5 text-brand-400" />
+              Tanda Tangan Pengemudi (TTD)
+            </h3>
+
+            <div className="w-full bg-surface-950 p-4 border border-surface-800 rounded-xl flex items-center justify-center min-h-[160px]">
+              <img
+                src={viewingSignatureUrl}
+                alt="Tanda Tangan Pengemudi"
+                className="max-h-40 max-w-full object-contain filter invert contrast-200"
+              />
+            </div>
+
+            <button
+              onClick={() => setViewingSignatureUrl(null)}
+              className="w-full py-2.5 rounded-xl bg-surface-800 hover:bg-surface-700 text-white text-sm font-medium transition-colors"
+            >
+              Tutup
+            </button>
           </div>
         </div>
       )}
