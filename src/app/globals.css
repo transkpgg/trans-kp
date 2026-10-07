@@ -152,14 +152,22 @@
     to { opacity: 1; transform: translateY(0); }
   }
 
+  .animate-fadeIn {
+    animation: fade-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
   /* Slide Up animation */
   .slide-up {
     animation: slide-up 0.4s ease-out forwards;
   }
 
+  .animate-slideUp {
+    animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
   @keyframes slide-up {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; transform: translateY(20px) scale(0.96); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
   }
 
   /* Status Badge */

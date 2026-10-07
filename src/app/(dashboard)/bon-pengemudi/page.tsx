@@ -939,13 +939,6 @@ export default function EmployeeBonPengemudiPage() {
           </div>
         </div>
       )}
-
-      {/* Smooth Loading Overlay */}
-      <LoadingOverlay
-        isOpen={loadingState.show}
-        message={loadingState.message}
-        submessage={loadingState.submessage}
-      />
     </div>
   );
 }

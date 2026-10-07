@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Toaster } from "sonner";
+import { LoadingProvider } from "@/components/providers/loading-provider";
 
 export const metadata: Metadata = {
   title: "Trans KP — Sistem Operasional Pengemudi",
@@ -30,7 +31,9 @@ export default function RootLayout({
   return (
     <html lang="id">
       <body>
-        {children}
+        <LoadingProvider>
+          {children}
+        </LoadingProvider>
         <Toaster 
           theme="dark" 
           position="top-right" 
