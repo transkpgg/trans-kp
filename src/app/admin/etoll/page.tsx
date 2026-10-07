@@ -314,7 +314,19 @@ export default function EtollPage() {
           handleTagScanned(uid, mode, cardIdForRegister);
         };
         (window as any).onFlutterNFCError = (err: string) => {
-          if (!err.toLowerCase().includes("user canceled") && !err.toLowerCase().includes("session timeout")) {
+          if (err === "NFC_DISABLED") {
+            toast.error("NFC Belum Aktif", {
+              description: "NFC belum diaktifkan di HP Anda. Silakan aktifkan terlebih dahulu.",
+              action: {
+                label: "Buka Pengaturan",
+                onClick: () => {
+                  if ((window as any).FlutterNFCChannel) {
+                    (window as any).FlutterNFCChannel.postMessage("open_settings");
+                  }
+                }
+              }
+            });
+          } else if (!err.toLowerCase().includes("user canceled") && !err.toLowerCase().includes("session timeout")) {
             toast.error("NFC Error", { description: err });
           }
           stopNFCScan();

@@ -205,6 +205,8 @@ class _WebViewPageState extends State<WebViewPage> {
   late final WebViewController _controller;
   bool _isLoading = true;
 
+  static const _nfcChannel = MethodChannel('id.transkp.app/nfc_settings');
+
   @override
   void initState() {
     super.initState();
@@ -233,16 +235,32 @@ class _WebViewPageState extends State<WebViewPage> {
             try {
               var availability = await FlutterNfcKit.nfcAvailability;
               if (availability != NFCAvailability.available) {
+                // Check native state for accuracy
+                try {
+                  final String? state = await _nfcChannel.invokeMethod<String>('nfcState');
+                  if (state == 'disabled') {
+                    controller.runJavaScript(
+                      "if (window.onFlutterNFCError) window.onFlutterNFCError('NFC_DISABLED');",
+                    );
+                    return;
+                  }
+                } catch (_) {}
+
                 controller.runJavaScript(
-                  "if (window.onFlutterNFCError) window.onFlutterNFCError('NFC tidak aktif atau tidak didukung di perangkat ini.');",
+                  "if (window.onFlutterNFCError) window.onFlutterNFCError('NFC tidak aktif atau tidak didukung pada perangkat ini.');",
                 );
                 return;
               }
 
+              // End any active session first
+              try {
+                await FlutterNfcKit.finish();
+              } catch (_) {}
+
               var tag = await FlutterNfcKit.poll(
                 timeout: const Duration(seconds: 30),
-                iosMultipleTagMessage: "Multiple tags found!",
-                iosAlertMessage: "Hold card near device",
+                iosMultipleTagMessage: "Terdeteksi beberapa kartu!",
+                iosAlertMessage: "Tempelkan kartu pada bagian belakang HP",
               );
 
               String uid = tag.id;
@@ -253,14 +271,25 @@ class _WebViewPageState extends State<WebViewPage> {
               );
             } catch (e) {
               await FlutterNfcKit.finish().catchError((_) {});
-              String errMessage = e.toString().replaceAll("'", "\\'").replaceAll("\n", " ");
-              controller.runJavaScript(
-                "if (window.onFlutterNFCError) window.onFlutterNFCError('$errMessage');",
-              );
+              String errStr = e.toString();
+              if (errStr.contains("404") || errStr.contains("NDEFReader") || errStr.contains("not supported")) {
+                controller.runJavaScript(
+                  "if (window.onFlutterNFCError) window.onFlutterNFCError('NFC_DISABLED');",
+                );
+              } else {
+                String errMessage = errStr.replaceAll("'", "\\'").replaceAll("\n", " ");
+                controller.runJavaScript(
+                  "if (window.onFlutterNFCError) window.onFlutterNFCError('$errMessage');",
+                );
+              }
             }
           } else if (message.message == 'stop') {
             try {
               await FlutterNfcKit.finish();
+            } catch (_) {}
+          } else if (message.message == 'open_settings') {
+            try {
+              await _nfcChannel.invokeMethod('openNfcSettings');
             } catch (_) {}
           }
         },
