@@ -26,6 +26,7 @@ import { toast } from "sonner";
 import { INDONESIA_CITIES } from "@/lib/indonesia-cities";
 import { formatRupiah, formatCurrencyInput, parseCurrencyInput } from "@/lib/utils";
 import { SignaturePad } from "@/components/ui/signature-pad";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -39,6 +40,12 @@ export default function EmployeeBonPengemudiPage() {
   const currentUser = meData?.user;
   const bons = Array.isArray(bonData) ? bonData : [];
   const users = Array.isArray(userData) ? userData : [];
+
+  // Smooth Loading Overlay State
+  const [loadingState, setLoadingState] = useState<{ show: boolean; message: string; submessage?: string }>({
+    show: false,
+    message: "",
+  });
 
   // Filter States
   const [search, setSearch] = useState("");
@@ -177,6 +184,7 @@ export default function EmployeeBonPengemudiPage() {
 
   const handleToggleStatus = async (bonId: string, currentStatus: string) => {
     const newStatus = currentStatus === "lunas" ? "belum_lunas" : "lunas";
+    setLoadingState({ show: true, message: "Mengubah status pembayaran...", submessage: `Mengubah ke status ${newStatus === "lunas" ? "LUNAS 🟢" : "BELUM LUNAS 🔴"}` });
     try {
       const res = await fetch(`/api/driver-bon/${bonId}`, {
         method: "PUT",
@@ -185,12 +193,14 @@ export default function EmployeeBonPengemudiPage() {
       });
       if (res.ok) {
         toast.success(`Status pembayaran diubah ke ${newStatus === "lunas" ? "LUNAS 🟢" : "BELUM LUNAS 🔴"}`);
-        mutateBons();
+        await mutateBons();
       } else {
         toast.error("Gagal memperbarui status");
       }
     } catch (e) {
       toast.error("Kesalahan jaringan");
+    } finally {
+      setLoadingState({ show: false, message: "" });
     }
   };
 
@@ -228,6 +238,11 @@ export default function EmployeeBonPengemudiPage() {
     }
 
     setIsSubmitting(true);
+    setLoadingState({
+      show: true,
+      message: editingBon ? "Memperbarui Bon Pengemudi..." : "Menyimpan Bon Pengemudi Baru...",
+      submessage: "Sinkronisasi data ke server",
+    });
 
     const payload = {
       bon_date: bonDate,
@@ -257,7 +272,7 @@ export default function EmployeeBonPengemudiPage() {
       if (res.ok) {
         toast.success(editingBon ? "Bon Pengemudi berhasil diperbarui!" : "Bon Pengemudi berhasil dibuat!");
         setIsModalOpen(false);
-        mutateBons();
+        await mutateBons();
       } else {
         const err = await res.json();
         toast.error(err.message || "Gagal menyimpan data");
@@ -266,22 +281,31 @@ export default function EmployeeBonPengemudiPage() {
       toast.error("Terjadi kesalahan jaringan");
     } finally {
       setIsSubmitting(false);
+      setLoadingState({ show: false, message: "" });
     }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Apakah Anda yakin ingin menghapus data Bon Pengemudi ini?")) return;
 
+    setLoadingState({
+      show: true,
+      message: "Menghapus data Bon Pengemudi...",
+      submessage: "Menghapus rekord dari database",
+    });
+
     try {
       const res = await fetch(`/api/driver-bon/${id}`, { method: "DELETE" });
       if (res.ok) {
         toast.success("Bon Pengemudi berhasil dihapus");
-        mutateBons();
+        await mutateBons();
       } else {
         toast.error("Gagal menghapus data");
       }
     } catch (e) {
       toast.error("Kesalahan koneksi jaringan");
+    } finally {
+      setLoadingState({ show: false, message: "" });
     }
   };
 
@@ -915,6 +939,13 @@ export default function EmployeeBonPengemudiPage() {
           </div>
         </div>
       )}
+
+      {/* Smooth Loading Overlay */}
+      <LoadingOverlay
+        isOpen={loadingState.show}
+        message={loadingState.message}
+        submessage={loadingState.submessage}
+      />
     </div>
   );
 }
