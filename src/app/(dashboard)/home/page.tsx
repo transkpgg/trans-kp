@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
-import { Clock, Building2, ArrowRight, MapPin, CheckCircle2 } from "lucide-react";
+import { Clock, Building2, ArrowRight, MapPin, CheckCircle2, Receipt } from "lucide-react";
 import { formatTime, cn, getDurationString } from "@/lib/utils";
 import useSWR from "swr";
 
@@ -87,15 +87,17 @@ export default function UserHomePage() {
           </div>
         </Link>
 
-        <div className="p-5 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all bg-surface-800/50 border border-surface-700/50">
-          <div className="p-3 rounded-full bg-surface-700">
-            <MapPin className="w-8 h-8 text-surface-500" />
+        <Link 
+          href="/bon-pengemudi"
+          className="p-5 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all bg-emerald-600/20 border border-emerald-500/30 hover:bg-emerald-600/30 shadow-lg shadow-emerald-500/10 hover:scale-[1.02] active:scale-95 group"
+        >
+          <div className="p-3 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-all">
+            <Receipt className="w-8 h-8" />
           </div>
           <div className="text-center">
-            <p className="font-bold text-surface-500 text-sm">Fitur Lainnya</p>
-            <p className="text-[10px] text-surface-600 mt-1 uppercase tracking-wider">Segera Hadir</p>
+            <p className="font-bold text-white text-sm">Bon Pengemudi</p>
           </div>
-        </div>
+        </Link>
       </div>
 
       {/* Recent Hotel Visits Section */}

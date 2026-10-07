@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Home, History, Building2, User, LogOut } from "lucide-react";
+import { Home, History, Building2, User, Receipt, LogOut } from "lucide-react";
 import { cn, getGreeting, getInitials } from "@/lib/utils";
 import useSWR from "swr";
 
@@ -11,6 +11,7 @@ const fetcher = (url: string) => fetch(url).then(res => res.json());
 const navItems = [
   { name: "Home", href: "/home", icon: Home },
   { name: "Hotel", href: "/hotel-visit", icon: Building2 },
+  { name: "Bon Pengemudi", href: "/bon-pengemudi", icon: Receipt },
   { name: "Profil", href: "/profile", icon: User },
 ];
 
