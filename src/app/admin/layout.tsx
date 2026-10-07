@@ -61,6 +61,7 @@ export default function AdminLayout({
 
   const handleLogout = async () => {
     try {
+      localStorage.removeItem("transkp_remembered_credentials");
       await fetch('/api/auth/logout', { method: 'POST' });
       router.push('/login');
     } catch (e) {

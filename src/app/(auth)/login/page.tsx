@@ -101,34 +101,88 @@ export default function LoginPage() {
     };
   }, []);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Execute login helper
+  const executeLogin = useCallback(async (u: string, p: string, remember: boolean) => {
     setIsLoading(true);
     setError("");
     loginResult.current = null;
     loginError.current = null;
 
-    // Start animation
     startProgressAnimation();
 
-    // Fire API request
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username: u, password: p, rememberMe: remember }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
+        localStorage.removeItem("transkp_remembered_credentials");
         throw new Error(data.message || "Gagal login");
+      }
+
+      if (remember) {
+        localStorage.setItem(
+          "transkp_remembered_credentials",
+          JSON.stringify({ username: u, password: p, rememberMe: true })
+        );
+      } else {
+        localStorage.removeItem("transkp_remembered_credentials");
       }
 
       loginResult.current = data;
     } catch (err: any) {
       loginError.current = err.message;
     }
+  }, [startProgressAnimation]);
+
+  // Auto-login or restore remembered credentials on mount
+  useEffect(() => {
+    let isMounted = true;
+    const checkExistingSessionAndRemember = async () => {
+      try {
+        // 1. Check if active session cookie already exists
+        const meRes = await fetch("/api/auth/me");
+        if (meRes.ok) {
+          const meData = await meRes.json();
+          if (meData?.user && isMounted) {
+            if (meData.user.role === "admin_cabang" || meData.user.role === "super_admin") {
+              router.push("/admin/dashboard");
+            } else {
+              router.push("/home");
+            }
+            return;
+          }
+        }
+
+        // 2. If not authenticated, check remembered credentials in localStorage
+        const saved = localStorage.getItem("transkp_remembered_credentials");
+        if (saved) {
+          const { username: u, password: p, rememberMe: r } = JSON.parse(saved);
+          if (u && p && r && isMounted) {
+            setUsername(u);
+            setPassword(p);
+            setRememberMe(true);
+            executeLogin(u, p, true);
+          }
+        }
+      } catch (e) {
+        console.error("Auto login check error:", e);
+      }
+    };
+
+    checkExistingSessionAndRemember();
+    return () => {
+      isMounted = false;
+    };
+  }, [router, executeLogin]);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    executeLogin(username, password, rememberMe);
   };
 
   return (

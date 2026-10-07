@@ -55,7 +55,12 @@ export async function POST(request: Request) {
       );
     }
 
-    // Buat JWT Token
+    const { rememberMe } = body;
+
+    // Buat JWT Token (30 hari jika rememberMe, else 7 hari)
+    const expiresIn = rememberMe ? '30d' : '7d';
+    const maxAgeSeconds = rememberMe ? 30 * 24 * 60 * 60 : 7 * 24 * 60 * 60;
+
     const alg = 'HS256';
     const token = await new jose.SignJWT({ 
       id: user.id, 
@@ -65,10 +70,10 @@ export async function POST(request: Request) {
     })
       .setProtectedHeader({ alg })
       .setIssuedAt()
-      .setExpirationTime('24h')
+      .setExpirationTime(expiresIn)
       .sign(JWT_SECRET);
 
-    // Set cookie
+    // Set cookie persisten
     const cookieStore = await cookies();
     cookieStore.set({
       name: 'auth_token',
@@ -76,7 +81,8 @@ export async function POST(request: Request) {
       httpOnly: true,
       path: '/',
       secure: process.env.NODE_ENV === 'production',
-      // maxAge dihapus agar menjadi session cookie (otomatis logout saat browser ditutup)
+      maxAge: maxAgeSeconds,
+      sameSite: 'lax',
     });
 
     // Return safe user object (without password)

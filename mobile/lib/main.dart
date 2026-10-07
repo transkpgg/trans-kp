@@ -205,6 +205,8 @@ class WebViewPage extends StatefulWidget {
 class _WebViewPageState extends State<WebViewPage> {
   late final WebViewController _controller;
   bool _isLoading = true;
+  double _loadingProgress = 0.0;
+  DateTime? _lastBackPressTime;
 
   static const _nfcChannel = MethodChannel('id.transkp.app/nfc_settings');
 
@@ -318,15 +320,22 @@ class _WebViewPageState extends State<WebViewPage> {
       ..setUserAgent("TransKPApp/1.0 Mobile")
       ..setNavigationDelegate(
         NavigationDelegate(
+          onProgress: (int progress) {
+            setState(() {
+              _loadingProgress = progress / 100.0;
+            });
+          },
           onPageStarted: (String url) {
             setState(() {
               _isLoading = true;
+              _loadingProgress = 0.1;
             });
           },
           onPageFinished: (String url) {
             controller.runJavaScript("window.isFlutterApp = true;");
             setState(() {
               _isLoading = false;
+              _loadingProgress = 1.0;
             });
           },
         ),
@@ -361,19 +370,55 @@ class _WebViewPageState extends State<WebViewPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0B0F19),
-      body: SafeArea(
-        child: Stack(
-          children: [
-            WebViewWidget(controller: _controller),
-            if (_isLoading)
-              const LinearProgressIndicator(
-                backgroundColor: Colors.transparent,
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6366F1)),
-                minHeight: 3,
-              ),
-          ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, Object? result) async {
+        if (didPop) return;
+        if (await _controller.canGoBack()) {
+          await _controller.goBack();
+        } else {
+          final now = DateTime.now();
+          if (_lastBackPressTime == null ||
+              now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
+            _lastBackPressTime = now;
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('Tekan sekali lagi untuk keluar aplikasi'),
+                  duration: const Duration(seconds: 2),
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  backgroundColor: const Color(0xFF1E293B),
+                ),
+              );
+            }
+          } else {
+            SystemNavigator.pop();
+          }
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0B0F19),
+        body: SafeArea(
+          child: Stack(
+            children: [
+              WebViewWidget(controller: _controller),
+              if (_isLoading)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: LinearProgressIndicator(
+                    value: _loadingProgress > 0 ? _loadingProgress : null,
+                    backgroundColor: Colors.transparent,
+                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF6366F1)),
+                    minHeight: 3,
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
