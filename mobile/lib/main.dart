@@ -1,8 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:flutter_nfc_kit/flutter_nfc_kit.dart';
 
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
@@ -130,7 +130,7 @@ class _SplashScreenState extends State<SplashScreen>
                           borderRadius: BorderRadius.circular(28),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF6366F1).withOpacity(0.4),
+                              color: const Color(0xFF6366F1).withValues(alpha: 0.4),
                               blurRadius: 30,
                               spreadRadius: 5,
                               offset: const Offset(0, 10),
@@ -169,7 +169,7 @@ class _SplashScreenState extends State<SplashScreen>
                         style: TextStyle(
                           fontSize: 13,
                           letterSpacing: 1.2,
-                          color: Colors.white.withOpacity(0.6),
+                          color: Colors.white.withValues(alpha: 0.6),
                         ),
                       ),
                       const SizedBox(height: 48),
@@ -179,7 +179,7 @@ class _SplashScreenState extends State<SplashScreen>
                         child: CircularProgressIndicator(
                           strokeWidth: 2.5,
                           valueColor: AlwaysStoppedAnimation<Color>(
-                            const Color(0xFF6366F1).withOpacity(0.8),
+                            const Color(0xFF6366F1).withValues(alpha: 0.8),
                           ),
                         ),
                       ),
@@ -203,17 +203,25 @@ class WebViewPage extends StatefulWidget {
 }
 
 class _WebViewPageState extends State<WebViewPage> {
+  static const String _appUrl = 'https://trans-kp-app.vercel.app';
+  static const MethodChannel _nfcChannel = MethodChannel('id.transkp.app/nfc');
+
   late final WebViewController _controller;
   bool _isLoading = true;
-  double _loadingProgress = 0.0;
-  DateTime? _lastBackPressTime;
-
-  static const _nfcChannel = MethodChannel('id.transkp.app/nfc_settings');
 
   @override
   void initState() {
     super.initState();
     _requestPermissions();
+
+    // Listen for NFC tag / error events from Kotlin Android Native
+    _nfcChannel.setMethodCallHandler((call) async {
+      if (call.method == 'onTag') {
+        _callJs('onFlutterNFCResult', call.arguments as String);
+      } else if (call.method == 'onError') {
+        _callJs('onFlutterNFCError', call.arguments as String);
+      }
+    });
 
     late final PlatformWebViewControllerCreationParams params;
     if (WebViewPlatform.instance is WebKitWebViewPlatform) {
@@ -233,116 +241,27 @@ class _WebViewPageState extends State<WebViewPage> {
       ..setBackgroundColor(const Color(0xFF0B0F19))
       ..addJavaScriptChannel(
         'FlutterNFCChannel',
-        onMessageReceived: (JavaScriptMessage message) async {
-          if (message.message == 'scan') {
-            try {
-              // 1. Check native Android NFC state first for maximum accuracy
-              String nfcState = 'available';
-              try {
-                final String? state = await _nfcChannel.invokeMethod<String>('nfcState');
-                if (state != null) nfcState = state;
-              } catch (_) {}
-
-              if (nfcState == 'not_supported') {
-                controller.runJavaScript(
-                  "if (window.onFlutterNFCError) window.onFlutterNFCError('NFC_NOT_SUPPORTED');",
-                );
-                return;
-              } else if (nfcState == 'disabled') {
-                controller.runJavaScript(
-                  "if (window.onFlutterNFCError) window.onFlutterNFCError('NFC_DISABLED');",
-                );
-                return;
-              }
-
-              // Also check FlutterNfcKit availability as fallback
-              try {
-                var availability = await FlutterNfcKit.nfcAvailability;
-                if (availability == NFCAvailability.disabled) {
-                  controller.runJavaScript(
-                    "if (window.onFlutterNFCError) window.onFlutterNFCError('NFC_DISABLED');",
-                  );
-                  return;
-                } else if (availability == NFCAvailability.not_supported) {
-                  controller.runJavaScript(
-                    "if (window.onFlutterNFCError) window.onFlutterNFCError('NFC_NOT_SUPPORTED');",
-                  );
-                  return;
-                }
-              } catch (_) {}
-
-              // End any active session first
-              try {
-                await FlutterNfcKit.finish();
-              } catch (_) {}
-
-              var tag = await FlutterNfcKit.poll(
-                timeout: const Duration(seconds: 30),
-                iosMultipleTagMessage: "Terdeteksi beberapa kartu!",
-                iosAlertMessage: "Tempelkan kartu pada bagian belakang HP",
-              );
-
-              String uid = tag.id;
-              await FlutterNfcKit.finish();
-
-              controller.runJavaScript(
-                "if (window.onFlutterNFCResult) window.onFlutterNFCResult('$uid');",
-              );
-            } catch (e) {
-              await FlutterNfcKit.finish().catchError((_) {});
-              String errStr = e.toString();
-              if (errStr.contains("disabled") || errStr.contains("off") || errStr.contains("404") || errStr.contains("NDEFReader")) {
-                controller.runJavaScript(
-                  "if (window.onFlutterNFCError) window.onFlutterNFCError('NFC_DISABLED');",
-                );
-              } else if (errStr.contains("not_supported") || errStr.contains("no nfc")) {
-                controller.runJavaScript(
-                  "if (window.onFlutterNFCError) window.onFlutterNFCError('NFC_NOT_SUPPORTED');",
-                );
-              } else {
-                String errMessage = errStr.replaceAll("'", "\\'").replaceAll("\n", " ");
-                controller.runJavaScript(
-                  "if (window.onFlutterNFCError) window.onFlutterNFCError('$errMessage');",
-                );
-              }
-            }
-          } else if (message.message == 'stop') {
-            try {
-              await FlutterNfcKit.finish();
-            } catch (_) {}
-          } else if (message.message == 'open_settings') {
-            try {
-              await _nfcChannel.invokeMethod('openNfcSettings');
-            } catch (_) {}
-          }
+        onMessageReceived: (JavaScriptMessage message) {
+          _handleNfcMessage(message.message);
         },
       )
-      ..setUserAgent("TransKPApp/1.0 Mobile")
       ..setNavigationDelegate(
         NavigationDelegate(
-          onProgress: (int progress) {
-            setState(() {
-              _loadingProgress = progress / 100.0;
-            });
-          },
           onPageStarted: (String url) {
             setState(() {
               _isLoading = true;
-              _loadingProgress = 0.1;
             });
           },
           onPageFinished: (String url) {
-            controller.runJavaScript("window.isFlutterApp = true;");
             setState(() {
               _isLoading = false;
-              _loadingProgress = 1.0;
             });
+            _controller.runJavaScript('window.isFlutterApp = true;');
           },
         ),
-      )
-      ..loadRequest(
-        Uri.parse('https://trans-kp-app.vercel.app'),
       );
+
+    _loadWithCustomUserAgent(controller);
 
     if (controller.platform is AndroidWebViewController) {
       AndroidWebViewController.enableDebugging(true);
@@ -360,6 +279,54 @@ class _WebViewPageState extends State<WebViewPage> {
     _controller = controller;
   }
 
+  Future<void> _loadWithCustomUserAgent(WebViewController controller) async {
+    try {
+      final String? ua = await controller.getUserAgent();
+      if (ua != null && !ua.contains('TransKPApp')) {
+        await controller.setUserAgent('$ua TransKPApp');
+      }
+    } catch (_) {}
+    await controller.loadRequest(Uri.parse(_appUrl));
+  }
+
+  void _callJs(String fn, String arg) {
+    final String safeArg = jsonEncode(arg);
+    _controller.runJavaScript(
+      'if (typeof window.$fn === "function") { window.$fn($safeArg); }',
+    );
+  }
+
+  Future<void> _handleNfcMessage(String msg) async {
+    try {
+      switch (msg) {
+        case 'scan':
+          final String? status =
+              await _nfcChannel.invokeMethod<String>('startScan');
+          if (status != 'OK') {
+            _callJs('onFlutterNFCError', status ?? 'NFC_NOT_SUPPORTED');
+          }
+          break;
+        case 'stop':
+          await _nfcChannel.invokeMethod('stopScan');
+          break;
+        case 'open_settings':
+          await _nfcChannel.invokeMethod('openSettings');
+          break;
+      }
+    } on MissingPluginException {
+      _callJs('onFlutterNFCError', 'NFC_NOT_SUPPORTED');
+    } catch (e) {
+      _callJs('onFlutterNFCError', e.toString());
+    }
+  }
+
+  @override
+  void dispose() {
+    _nfcChannel.invokeMethod('stopScan').catchError((_) {});
+    _nfcChannel.setMethodCallHandler(null);
+    super.dispose();
+  }
+
   Future<void> _requestPermissions() async {
     await [
       Permission.camera,
@@ -370,55 +337,19 @@ class _WebViewPageState extends State<WebViewPage> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (bool didPop, Object? result) async {
-        if (didPop) return;
-        if (await _controller.canGoBack()) {
-          await _controller.goBack();
-        } else {
-          final now = DateTime.now();
-          if (_lastBackPressTime == null ||
-              now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
-            _lastBackPressTime = now;
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Tekan sekali lagi untuk keluar aplikasi'),
-                  duration: const Duration(seconds: 2),
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  backgroundColor: const Color(0xFF1E293B),
-                ),
-              );
-            }
-          } else {
-            SystemNavigator.pop();
-          }
-        }
-      },
-      child: Scaffold(
-        backgroundColor: const Color(0xFF0B0F19),
-        body: SafeArea(
-          child: Stack(
-            children: [
-              WebViewWidget(controller: _controller),
-              if (_isLoading)
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: LinearProgressIndicator(
-                    value: _loadingProgress > 0 ? _loadingProgress : null,
-                    backgroundColor: Colors.transparent,
-                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF6366F1)),
-                    minHeight: 3,
-                  ),
-                ),
-            ],
-          ),
+    return Scaffold(
+      backgroundColor: const Color(0xFF0B0F19),
+      body: SafeArea(
+        child: Stack(
+          children: [
+            WebViewWidget(controller: _controller),
+            if (_isLoading)
+              const LinearProgressIndicator(
+                backgroundColor: Colors.transparent,
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6366F1)),
+                minHeight: 3,
+              ),
+          ],
         ),
       ),
     );
