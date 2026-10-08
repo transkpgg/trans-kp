@@ -2,12 +2,11 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Users, Car, MapPin, Building2, Database } from "lucide-react";
+import { Users, Car, MapPin, Database } from "lucide-react";
 import { cn } from "@/lib/utils";
 import UsersPage from "../users/page";
 import VehiclesPage from "../vehicles/page";
 import DestinationsPage from "../destinations/page";
-import BranchesPage from "../branches/page";
 
 function MasterDataContent() {
   const searchParams = useSearchParams();
@@ -29,7 +28,6 @@ function MasterDataContent() {
     { id: "users", name: "Pengguna", icon: Users, desc: "Kelola akun pengguna & peran" },
     { id: "vehicles", name: "Kendaraan", icon: Car, desc: "Kelola nopol & kendaraan" },
     { id: "destinations", name: "Luar Kota (Tujuan)", icon: MapPin, desc: "Kelola kota tujuan SPD" },
-    { id: "branches", name: "Cabang", icon: Building2, desc: "Kelola cabang & geofence" },
   ];
 
   return (
@@ -44,7 +42,7 @@ function MasterDataContent() {
             <div>
               <h1 className="text-2xl font-bold text-white">Master Data</h1>
               <p className="text-sm text-surface-400 mt-0.5">
-                Kelola seluruh data master sistem (Pengguna, Kendaraan, Kota Tujuan, dan Cabang Kantor) dalam satu tempat.
+                Kelola data master sistem (Pengguna, Kendaraan, dan Kota Tujuan).
               </p>
             </div>
           </div>
@@ -79,7 +77,6 @@ function MasterDataContent() {
         {activeTab === "users" && <UsersPage />}
         {activeTab === "vehicles" && <VehiclesPage />}
         {activeTab === "destinations" && <DestinationsPage />}
-        {activeTab === "branches" && <BranchesPage />}
       </div>
     </div>
   );
