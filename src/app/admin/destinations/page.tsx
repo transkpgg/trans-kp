@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import useSWR from "swr";
 import { toast } from "sonner";
 import { MapPin, Plus, Search, Edit, Trash2, X, Route, CheckCircle2, Ban, DownloadCloud } from "lucide-react";
@@ -12,6 +13,14 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 const emptyForm = { city: "", province: "", distance_km: "", notes: "", is_active: true };
 
 export default function DestinationsPage() {
+  const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (pathname === "/admin/destinations") {
+      router.replace("/admin/master?tab=destinations");
+    }
+  }, [pathname, router]);
   const { data, mutate, isLoading } = useSWR("/api/destinations", fetcher);
   const destinations: any[] = Array.isArray(data) ? data : [];
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { Search, Plus, Filter, MoreVertical, Edit, UserX, CheckCircle, Shield, Trash2, Upload, Download, X } from "lucide-react";
 import { mockCurrentAdmin } from "@/lib/mock-data";
 import useSWR from "swr";
@@ -11,6 +12,14 @@ import { toast } from "sonner";
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export default function UsersPage() {
+  const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (pathname === "/admin/users") {
+      router.replace("/admin/master?tab=users");
+    }
+  }, [pathname, router]);
   const { data: users, error, mutate } = useSWR("/api/users", fetcher);
   const [search, setSearch] = useState("");
   const [selectedRole, setSelectedRole] = useState("all");

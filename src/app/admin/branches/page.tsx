@@ -1,10 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { Building, MapPin, Edit, Trash2, Plus, Users, Navigation } from "lucide-react";
 import { mockBranches } from "@/lib/mock-data";
 
 export default function BranchesPage() {
+  const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (pathname === "/admin/branches") {
+      router.replace("/admin/master?tab=branches");
+    }
+  }, [pathname, router]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   return (

@@ -16,8 +16,7 @@ import {
   Menu,
   X,
   Bell,
-  Car,
-  MapPinned
+  Database
 } from "lucide-react";
 import { cn, getInitials } from "@/lib/utils";
 import { mockCurrentAdmin } from "@/lib/mock-data";
@@ -25,12 +24,10 @@ import { useRouter } from "next/navigation";
 
 const adminNavItems = [
   { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
-  { name: "Master User", href: "/admin/users", icon: Users },
+  { name: "Master Data", href: "/admin/master", icon: Database },
   { name: "Hotel Visit", href: "/admin/hotel-visits", icon: Building2 },
   { name: "E-Toll", href: "/admin/etoll", icon: CreditCard },
   { name: "Bon Pengemudi", href: "/admin/bon-pengemudi", icon: Receipt },
-  { name: "Master Kendaraan", href: "/admin/vehicles", icon: Car },
-  { name: "Master Luar Kota", href: "/admin/destinations", icon: MapPinned },
   { name: "Laporan", href: "/admin/reports", icon: FileBarChart },
 ];
 

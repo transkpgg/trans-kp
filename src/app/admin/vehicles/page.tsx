@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import useSWR from "swr";
 import { toast } from "sonner";
 import { Car, Plus, Search, Edit, Trash2, X, Users, CheckCircle2, Ban } from "lucide-react";
@@ -12,6 +13,14 @@ const VEHICLE_TYPES = ["Mobil", "Minibus", "Bus", "Truk", "Motor"];
 const emptyForm = { nopol: "", name: "", type: "Mobil", capacity: "", notes: "", is_active: true };
 
 export default function VehiclesPage() {
+  const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (pathname === "/admin/vehicles") {
+      router.replace("/admin/master?tab=vehicles");
+    }
+  }, [pathname, router]);
   const { data, mutate, isLoading } = useSWR("/api/vehicles", fetcher);
   const vehicles: any[] = Array.isArray(data) ? data : [];
 
