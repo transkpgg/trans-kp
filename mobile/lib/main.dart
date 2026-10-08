@@ -72,7 +72,7 @@ class _SplashScreenState extends State<SplashScreen>
     _animationController.forward();
 
     // Navigate to WebViewPage after splash delay
-    Future.delayed(const Duration(milliseconds: 2500), () {
+    Future.delayed(const Duration(milliseconds: 400), () {
       if (mounted) {
         Navigator.of(context).pushReplacement(
           PageRouteBuilder(
