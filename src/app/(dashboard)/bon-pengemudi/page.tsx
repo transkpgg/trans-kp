@@ -35,6 +35,8 @@ const KETERANGAN_OPTIONS = ["Antar", "Jemput", "Pergi Pulang", "Inap"];
 export default function EmployeeBonPengemudiPage() {
   const { data: bonData, mutate: mutateBons, isLoading: isBonsLoading } = useSWR("/api/driver-bon", fetcher);
   const { data: userData } = useSWR("/api/users", fetcher);
+  const { data: vehicleData } = useSWR("/api/vehicles", fetcher);
+  const { data: destinationData } = useSWR("/api/destinations", fetcher);
   const { data: meData } = useSWR("/api/auth/me", fetcher);
 
   const currentUser = meData?.user;
@@ -81,13 +83,26 @@ export default function EmployeeBonPengemudiPage() {
   const [driverSearch, setDriverSearch] = useState("");
   const [isDriverDropdownOpen, setIsDriverDropdownOpen] = useState(false);
 
+  // Master Luar Kota (fallback ke daftar bawaan bila master masih kosong)
+  const masterCities: string[] = useMemo(() => {
+    const list = Array.isArray(destinationData)
+      ? destinationData.filter((d: any) => d.is_active).map((d: any) => d.city as string)
+      : [];
+    return list.length > 0 ? list : INDONESIA_CITIES;
+  }, [destinationData]);
+
+  const activeVehicles: any[] = useMemo(
+    () => (Array.isArray(vehicleData) ? vehicleData.filter((v: any) => v.is_active) : []),
+    [vehicleData]
+  );
+
   // Filtered cities
   const filteredCities = useMemo(() => {
-    if (!citySearch) return INDONESIA_CITIES;
-    return INDONESIA_CITIES.filter((city) =>
+    if (!citySearch) return masterCities;
+    return masterCities.filter((city) =>
       city.toLowerCase().includes(citySearch.toLowerCase())
     );
-  }, [citySearch]);
+  }, [citySearch, masterCities]);
 
   // Filtered users for driver dropdown
   const filteredDrivers = useMemo(() => {
@@ -647,12 +662,18 @@ export default function EmployeeBonPengemudiPage() {
                   </label>
                   <input
                     type="text"
-                    placeholder="Contoh: B 1234 ABC"
+                    list="vehicle-nopol-options"
+                    placeholder="Pilih dari Master Kendaraan / ketik manual"
                     value={nopol}
                     onChange={(e) => setNopol(e.target.value.toUpperCase())}
                     required
                     className="w-full bg-surface-950 border border-surface-700 rounded-xl px-3.5 py-2.5 text-sm text-white uppercase focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                   />
+                  <datalist id="vehicle-nopol-options">
+                    {activeVehicles.map((v: any) => (
+                      <option key={v.id} value={v.nopol}>{v.name}</option>
+                    ))}
+                  </datalist>
                 </div>
               </div>
 

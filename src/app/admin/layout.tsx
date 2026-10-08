@@ -15,7 +15,9 @@ import {
   LogOut,
   Menu,
   X,
-  Bell
+  Bell,
+  Car,
+  MapPinned
 } from "lucide-react";
 import { cn, getInitials } from "@/lib/utils";
 import { mockCurrentAdmin } from "@/lib/mock-data";
@@ -27,6 +29,8 @@ const adminNavItems = [
   { name: "Hotel Visit", href: "/admin/hotel-visits", icon: Building2 },
   { name: "E-Toll", href: "/admin/etoll", icon: CreditCard },
   { name: "Bon Pengemudi", href: "/admin/bon-pengemudi", icon: Receipt },
+  { name: "Master Kendaraan", href: "/admin/vehicles", icon: Car },
+  { name: "Master Luar Kota", href: "/admin/destinations", icon: MapPinned },
   { name: "Laporan", href: "/admin/reports", icon: FileBarChart },
 ];
 

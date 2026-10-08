@@ -143,3 +143,26 @@ model DriverBon {
 
   driver          User?    @relation(fields: [driver_id], references: [id])
 }
+
+model Vehicle {
+  id          String   @id @default(cuid())
+  nopol       String   @unique
+  name        String   // Nama / merk kendaraan, mis. Toyota Hiace
+  type        String   @default("Mobil") // Mobil, Minibus, Bus, Truk, Motor
+  capacity    Int?
+  notes       String?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+}
+
+model Destination {
+  id          String   @id @default(cuid())
+  city        String   @unique
+  province    String?
+  distance_km Int?
+  notes       String?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+}
