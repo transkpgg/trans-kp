@@ -23,7 +23,7 @@ async function getUserFromToken() {
 
 interface Notification {
   id: string;
-  type: 'etoll' | 'hotel';
+  type: 'etoll' | 'hotel' | 'fuel';
   message: string;
   timestamp: string;
 }
@@ -47,7 +47,7 @@ export async function GET() {
 
     const sixtySecondsAgo = new Date(Date.now() - 60 * 1000);
 
-    const [etollHistories, hotelVisits] = await Promise.all([
+    const [etollHistories, hotelVisits, fuelAnomalies] = await Promise.all([
       prisma.etollHistory.findMany({
         where: {
           timestamp: { gte: sixtySecondsAgo },
@@ -69,6 +69,13 @@ export async function GET() {
           user: { select: { full_name: true } },
         },
         orderBy: { check_in_time: 'desc' },
+      }),
+      prisma.fuelAnomaly.findMany({
+        where: {
+          status: 'baru',
+          timestamp: { gte: sixtySecondsAgo },
+        },
+        orderBy: { timestamp: 'desc' },
       }),
     ]);
 
@@ -110,6 +117,15 @@ export async function GET() {
           timestamp: visit.check_in_time.toISOString(),
         });
       }
+    }
+
+    for (const a of fuelAnomalies) {
+      notifications.push({
+        id: `fuel-${a.id}`,
+        type: 'fuel',
+        message: `[Indikasi Anomali BBM] ${a.nopol} - ${a.title} (${a.diff_value || ''})`,
+        timestamp: a.timestamp.toISOString(),
+      });
     }
 
     notifications.sort(

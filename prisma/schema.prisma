@@ -28,6 +28,7 @@ model User {
   hotel_visits HotelVisit[]
   etoll_histories EtollHistory[]
   driver_bons  DriverBon[]
+  fuel_trips   FuelTripLog[]
 }
 
 model Branch {
@@ -145,16 +146,19 @@ model DriverBon {
 }
 
 model Vehicle {
-  id          String   @id @default(cuid())
-  nopol       String   @unique
-  name        String   // Nama / merk kendaraan, mis. Toyota Hiace
-  type        String   @default("Mobil") // Mobil, Minibus, Bus, Truk, Motor
-  capacity    Int?
-  fuel_consumption Float? // Konsumsi BBM: jarak (km) per 1 liter
-  notes       String?
-  is_active   Boolean  @default(true)
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
+  id               String        @id @default(cuid())
+  nopol            String        @unique
+  name             String        // Nama / merk kendaraan, mis. Toyota Hiace
+  type             String        @default("Mobil") // Mobil, Minibus, Bus, Truk, Motor
+  capacity         Int?
+  fuel_consumption Float?       // Konsumsi BBM standar: jarak (km) per 1 liter
+  tank_capacity    Float?       @default(60) // Kapasitas tangki bahan bakar (Liter)
+  notes            String?
+  is_active        Boolean       @default(true)
+  created_at       DateTime      @default(now())
+  updated_at       DateTime      @updatedAt
+  
+  fuel_trips       FuelTripLog[]
 }
 
 model Destination {
@@ -167,3 +171,99 @@ model Destination {
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
 }
+
+// ==========================================
+// MONITORING BBM & DETEKSI ANOMALI MODELS
+// ==========================================
+
+model FuelTripLog {
+  id                 String        @id @default(cuid())
+  vehicle_id         String?
+  vehicle            Vehicle?      @relation(fields: [vehicle_id], references: [id])
+  nopol              String
+  driver_id          String?
+  driver             User?         @relation(fields: [driver_id], references: [id])
+  driver_name        String
+  branch_id          String?
+  trip_date          DateTime      @default(now())
+  start_km           Float
+  end_km             Float
+  odo_distance       Float         // Jarak tempuh odometer (km) = end_km - start_km
+  gps_distance       Float?        // Jarak tempuh GPS (km) jika tersedia
+  fuel_start         Float?        // Level BBM awal (Liter)
+  fuel_end           Float?        // Level BBM akhir (Liter)
+  fuel_refill        Float         @default(0) // Pengisian BBM (Liter)
+  fuel_cost          Float         @default(0) // Total biaya pembelian BBM (Rp)
+  fuel_used          Float         // BBM terpakai (Liter)
+  actual_kml         Float         // Konsumsi aktual km / liter = jarak / bbm terpakai
+  actual_l100km      Float         // Liter / 100 km = (bbm terpakai / jarak) * 100
+  cost_per_km        Float         // Biaya per km (Rp/km) = fuel_cost / jarak
+  standard_kml       Float?        // Standar konsumsi kendaraan (km/L)
+  diff_kml           Float?        // Selisih km/L (actual - standard)
+  diff_percent       Float?        // Persentase selisih vs standar
+  vehicle_status     String        @default("berhenti") // berjalan, berhenti, parkir, mesin_menyala, offline
+  sensor_status      String        @default("belum_terhubung") // terhubung, belum_terhubung, offline
+  current_fuel_level Float?        // Level BBM terkini (Liter)
+  tank_capacity      Float?        @default(60) // Kapasitas tangki (Liter)
+  fuel_percent       Float?        // Persentase level BBM (%)
+  last_telemetry_at  DateTime?     // Waktu terakhir data sensor/GPS diterima
+  last_location      String?       // Posisi/nama lokasi terakhir
+  latitude           Float?
+  longitude          Float?
+  anomaly_status     String        @default("normal") // normal, perlu_diperiksa, indikasi_anomali
+  calculation_method String        @default("full_to_full") // sensor_tangki, flow_meter, full_to_full
+  receipt_url        String?       // Bukti struk pengisian jika ada
+  notes              String?
+  is_manual          Boolean       @default(true) // Menandai jika data diinput/diedit manual
+  created_at         DateTime      @default(now())
+  updated_at         DateTime      @updatedAt
+
+  anomalies          FuelAnomaly[]
+}
+
+model FuelAnomaly {
+  id                 String       @id @default(cuid())
+  trip_id            String?
+  trip               FuelTripLog? @relation(fields: [trip_id], references: [id])
+  nopol              String
+  driver_name        String?
+  timestamp          DateTime     @default(now())
+  anomaly_type       String       // penurunan_tiba_tiba, pengisian_tak_tercatat, konsumsi_melebihi_standar, selisih_gps_odometer, sensor_terputus
+  title              String
+  description        String
+  severity           String       @default("warning") // info, warning, critical
+  location_name      String?
+  latitude           Float?
+  longitude          Float?
+  diff_value         String?      // Contoh: "-12.5 Liter", "+35% deviasi", "Selisih 40 km"
+  status             String       @default("baru") // baru, sedang_diperiksa, selesai, tidak_terbukti
+  verified_by        String?
+  verified_at        DateTime?
+  verification_notes String?
+  created_at         DateTime     @default(now())
+  updated_at         DateTime     @updatedAt
+}
+
+model FuelThresholdConfig {
+  id                          String   @id @default(cuid())
+  max_consumption_diff_percent Float    @default(20.0) // Ambang batas toleransi selisih konsumsi BBM (%)
+  sudden_drop_liter           Float    @default(5.0)  // Ambang batas penurunan BBM mendadak (Liter)
+  max_gps_odo_diff_percent    Float    @default(15.0) // Ambang batas toleransi selisih jarak GPS vs Odometer (%)
+  offline_timeout_minutes     Int      @default(60)   // Ambang batas sensor offline / timeout (menit)
+  updated_by                  String?
+  updated_at                  DateTime @updatedAt
+}
+
+model FuelAuditLog {
+  id          String   @id @default(cuid())
+  entity_type String   // anomaly, trip, config
+  entity_id   String
+  action      String   // update_status, create_trip, update_config, edit_trip
+  actor_name  String
+  actor_nik   String?
+  old_value   String?  // JSON string nilai sebelum
+  new_value   String?  // JSON string nilai sesudah
+  notes       String?  // Alasan / catatan audit
+  timestamp   DateTime @default(now())
+}
+

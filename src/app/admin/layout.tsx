@@ -16,7 +16,8 @@ import {
   Menu,
   X,
   Bell,
-  Database
+  Database,
+  Fuel
 } from "lucide-react";
 import { cn, getInitials } from "@/lib/utils";
 import { mockCurrentAdmin } from "@/lib/mock-data";
@@ -25,6 +26,7 @@ import { useRouter } from "next/navigation";
 const adminNavItems = [
   { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
   { name: "Master Data", href: "/admin/master", icon: Database },
+  { name: "Monitoring BBM", href: "/admin/fuel-monitoring", icon: Fuel },
   { name: "Hotel Visit", href: "/admin/hotel-visits", icon: Building2 },
   { name: "E-Toll", href: "/admin/etoll", icon: CreditCard },
   { name: "Bon Pengemudi", href: "/admin/bon-pengemudi", icon: Receipt },
@@ -53,7 +55,9 @@ export default function AdminLayout({
     notifications.forEach((n: any) => {
       if (!seenNotifications.current.has(n.id)) {
         seenNotifications.current.add(n.id);
-        if (n.type === 'hotel') {
+        if (n.type === 'fuel') {
+          toast.error(n.message, { description: 'Monitoring BBM & Anomali', duration: 8000 });
+        } else if (n.type === 'hotel') {
           toast.info(n.message, { description: 'Kunjungan Hotel', duration: 6000 });
         } else {
           toast.success(n.message, { description: 'Transaksi E-Toll', duration: 6000 });
