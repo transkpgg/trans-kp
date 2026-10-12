@@ -28,7 +28,7 @@ import {
   Nfc,
   ListFilter
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrencyInput, parseCurrencyInput } from "@/lib/utils";
 import { mockUsers } from "@/lib/mock-data";
 import useSWR from "swr";
 import * as XLSX from "xlsx";
@@ -393,7 +393,7 @@ export default function EtollPage() {
     if (!returningCard) return;
     try {
       const payload: any = { action: "return" };
-      if (returnBalance !== "") payload.new_balance = parseInt(returnBalance);
+      if (returnBalance !== "") payload.new_balance = parseCurrencyInput(returnBalance);
 
       const res = await fetch(`/api/etoll/${returningCard.id}`, {
         method: "PUT",
@@ -430,7 +430,7 @@ export default function EtollPage() {
 
   const handleTopupSubmit = async () => {
     if (!topupCard || !topupAmount) return;
-    const amount = parseInt(topupAmount);
+    const amount = parseCurrencyInput(topupAmount);
     if (isNaN(amount) || amount <= 0) return toast.error("Nominal tidak valid");
     
     try {
@@ -455,7 +455,7 @@ export default function EtollPage() {
     if (!assigningCard || !assignDriverId) return toast.error("Pilih pengemudi terlebih dahulu");
     try {
       const payload: any = { action: "assign", user_id: assignDriverId, notes: assignNotes };
-      if (assignBalance !== "") payload.new_balance = parseInt(assignBalance);
+      if (assignBalance !== "") payload.new_balance = parseCurrencyInput(assignBalance);
 
       const res = await fetch(`/api/etoll/${assigningCard.id}`, {
         method: "PUT",
@@ -816,7 +816,7 @@ export default function EtollPage() {
               <div className="flex gap-2 pt-2 border-t border-surface-800">
                 {(card.status === "returned" || card.status === "available") && (
                   <button
-                    onClick={(e) => { e.stopPropagation(); setAssigningCard(card); setAssignBalance(card.balance.toString()); setAssignDriverSearch(""); setIsAssignDriverDropdownOpen(false); setIsAssignModalOpen(true); }}
+                    onClick={(e) => { e.stopPropagation(); setAssigningCard(card); setAssignBalance(""); setAssignDriverSearch(""); setIsAssignDriverDropdownOpen(false); setIsAssignModalOpen(true); }}
                     className="flex-1 py-2 rounded-lg bg-brand-500/10 text-brand-400 text-xs font-medium hover:bg-brand-500/20 transition-colors border border-brand-500/20"
                   >
                     Pinjamkan
@@ -824,7 +824,7 @@ export default function EtollPage() {
                 )}
                 {card.status === "in_use" && (
                   <button
-                    onClick={(e) => { e.stopPropagation(); setReturningCard(card); setReturnBalance(card.balance.toString()); setIsReturnModalOpen(true); }}
+                    onClick={(e) => { e.stopPropagation(); setReturningCard(card); setReturnBalance(formatCurrencyInput(card.balance)); setIsReturnModalOpen(true); }}
                     className="flex-1 py-2 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs font-medium hover:bg-emerald-500/20 transition-colors border border-emerald-500/20"
                   >
                     Kembalikan
@@ -1069,11 +1069,11 @@ export default function EtollPage() {
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-surface-300">Saldo Saat Dipinjamkan (Rp)</label>
                 <input 
-                  type="number" 
+                  type="text" inputMode="numeric" 
                   value={assignBalance}
-                  onChange={(e) => setAssignBalance(e.target.value)}
+                  onChange={(e) => setAssignBalance(formatCurrencyInput(e.target.value))}
                   className="w-full bg-surface-900 border border-surface-700 text-white rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 transition-colors" 
-                  placeholder="Contoh: 100000" 
+                  placeholder="Contoh: 100.000" 
                 />
               </div>
               <div className="space-y-1.5">
@@ -1124,9 +1124,9 @@ export default function EtollPage() {
                     <span className="text-surface-500 text-sm font-medium">Rp</span>
                   </div>
                   <input 
-                    type="number" 
+                    type="text" inputMode="numeric" 
                     value={returnBalance}
-                    onChange={(e) => setReturnBalance(e.target.value)}
+                    onChange={(e) => setReturnBalance(formatCurrencyInput(e.target.value))}
                     className="w-full bg-surface-900 border border-surface-700 text-white rounded-xl pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:border-emerald-500 transition-colors" 
                     placeholder="Sisa saldo..." 
                   />
@@ -1166,11 +1166,11 @@ export default function EtollPage() {
                     <span className="text-surface-500 text-sm font-medium">Rp</span>
                   </div>
                   <input 
-                    type="number" 
+                    type="text" inputMode="numeric" 
                     value={topupAmount}
-                    onChange={(e) => setTopupAmount(e.target.value)}
+                    onChange={(e) => setTopupAmount(formatCurrencyInput(e.target.value))}
                     className="w-full bg-surface-900 border border-surface-700 text-white rounded-xl pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition-colors" 
-                    placeholder="Contoh: 50000" 
+                    placeholder="Contoh: 50.000" 
                     autoFocus
                   />
                 </div>
