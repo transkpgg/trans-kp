@@ -42,9 +42,10 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const nopol = String(body.nopol || '').trim().toUpperCase().replace(/\s+/g, ' ');
-    const name = String(body.name || '').trim();
-    if (!nopol || !name) {
-      return NextResponse.json({ message: 'Nopol dan nama kendaraan wajib diisi' }, { status: 400 });
+    const type = String(body.type || '').trim() || 'Mobil';
+    const name = String(body.name || '').trim() || type;
+    if (!nopol) {
+      return NextResponse.json({ message: 'Nopol wajib diisi' }, { status: 400 });
     }
 
     const existing = await prisma.vehicle.findUnique({ where: { nopol } });
@@ -52,12 +53,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Nopol sudah terdaftar' }, { status: 400 });
     }
 
+    const fuel = body.fuel_consumption !== undefined && body.fuel_consumption !== '' && body.fuel_consumption !== null
+      ? parseFloat(String(body.fuel_consumption).replace(',', '.'))
+      : null;
+
     const vehicle = await prisma.vehicle.create({
       data: {
         nopol,
         name,
-        type: body.type || 'Mobil',
+        type,
         capacity: body.capacity ? parseInt(body.capacity) : null,
+        fuel_consumption: fuel !== null && !isNaN(fuel) ? fuel : null,
         notes: body.notes || null,
         is_active: body.is_active !== false,
       },

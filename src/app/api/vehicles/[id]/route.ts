@@ -36,8 +36,17 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       if (dup) return NextResponse.json({ message: 'Nopol sudah terdaftar' }, { status: 400 });
     }
     if (body.name !== undefined) data.name = String(body.name).trim();
-    if (body.type !== undefined) data.type = body.type;
+    if (body.type !== undefined) {
+      data.type = String(body.type).trim() || 'Mobil';
+      if (body.name === undefined) data.name = data.type;
+    }
     if (body.capacity !== undefined) data.capacity = body.capacity ? parseInt(body.capacity) : null;
+    if (body.fuel_consumption !== undefined) {
+      const fuel = body.fuel_consumption === '' || body.fuel_consumption === null
+        ? null
+        : parseFloat(String(body.fuel_consumption).replace(',', '.'));
+      data.fuel_consumption = fuel !== null && !isNaN(fuel) ? fuel : null;
+    }
     if (body.notes !== undefined) data.notes = body.notes || null;
     if (body.is_active !== undefined) data.is_active = !!body.is_active;
 

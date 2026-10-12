@@ -150,6 +150,7 @@ model Vehicle {
   name        String   // Nama / merk kendaraan, mis. Toyota Hiace
   type        String   @default("Mobil") // Mobil, Minibus, Bus, Truk, Motor
   capacity    Int?
+  fuel_consumption Float? // Konsumsi BBM: jarak (km) per 1 liter
   notes       String?
   is_active   Boolean  @default(true)
   created_at  DateTime @default(now())
