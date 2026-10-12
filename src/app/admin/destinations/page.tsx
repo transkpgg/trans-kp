@@ -1,16 +1,17 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import useSWR from "swr";
 import { toast } from "sonner";
-import { MapPin, Plus, Search, Edit, Trash2, X, Route, CheckCircle2, Ban, DownloadCloud } from "lucide-react";
+import * as XLSX from "xlsx";
+import { MapPin, Plus, Search, Edit, Trash2, X, CheckCircle2, Ban, DownloadCloud, Upload, FileSpreadsheet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { INDONESIA_CITIES } from "@/lib/indonesia-cities";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
-const emptyForm = { city: "", province: "", distance_km: "", notes: "", is_active: true };
+const emptyForm = { city: "", notes: "", is_active: true };
 
 export default function DestinationsPage() {
   const pathname = usePathname();
@@ -30,11 +31,13 @@ export default function DestinationsPage() {
   const [form, setForm] = useState(emptyForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return destinations.filter(
-      (d) => d.city.toLowerCase().includes(q) || (d.province || "").toLowerCase().includes(q)
+      (d) => d.city.toLowerCase().includes(q) || (d.notes || "").toLowerCase().includes(q)
     );
   }, [destinations, search]);
 
@@ -50,8 +53,6 @@ export default function DestinationsPage() {
     setEditing(d);
     setForm({
       city: d.city,
-      province: d.province || "",
-      distance_km: d.distance_km ? String(d.distance_km) : "",
       notes: d.notes || "",
       is_active: d.is_active,
     });
@@ -123,6 +124,45 @@ export default function DestinationsPage() {
     mutate();
   };
 
+  // Download template Excel untuk impor kota tujuan
+  const downloadTemplate = () => {
+    const ws = XLSX.utils.json_to_sheet([
+      { "Kota Tujuan": "Bandung", Catatan: "", Status: "Aktif" },
+      { "Kota Tujuan": "Semarang", Catatan: "Via tol", Status: "Aktif" },
+    ]);
+    ws["!cols"] = [{ wch: 28 }, { wch: 36 }, { wch: 12 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Kota Tujuan");
+    XLSX.writeFile(wb, "Template_Luar_Kota.xlsx");
+  };
+
+  // Impor kota tujuan dari file Excel
+  const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/destinations/import", { method: "POST", body: formData });
+      const result = await res.json();
+      if (res.ok) {
+        toast.success(result.message);
+        if (result.errors?.length) {
+          toast.warning(result.errors.slice(0, 5).join("\n") + (result.errors.length > 5 ? `\n...dan ${result.errors.length - 5} lainnya` : ""));
+        }
+        mutate();
+      } else {
+        toast.error(result.message || "Gagal mengimpor file");
+      }
+    } catch {
+      toast.error("Terjadi kesalahan jaringan");
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   const inputCls =
     "w-full bg-surface-950 border border-surface-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50";
   const labelCls = "text-xs font-semibold uppercase tracking-wider text-surface-400";
@@ -134,7 +174,29 @@ export default function DestinationsPage() {
           <h1 className="text-2xl font-bold text-white">Master Luar Kota</h1>
           <p className="text-sm text-surface-400 mt-1">Kelola daftar kota tujuan perjalanan luar kota untuk Bon Pengemudi.</p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-2">
+          <button
+            onClick={downloadTemplate}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-surface-700 text-surface-200 hover:bg-surface-800 transition-colors"
+          >
+            <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
+            Download Template
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            onChange={handleFileImport}
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-surface-700 text-surface-200 hover:bg-surface-800 transition-colors disabled:opacity-60"
+          >
+            <Upload className="w-5 h-5 text-sky-400" />
+            {isUploading ? "Mengimpor..." : "Import Excel"}
+          </button>
           <button
             onClick={importDefaultCities}
             disabled={isImporting}
@@ -177,7 +239,7 @@ export default function DestinationsPage() {
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-500" />
             <input
               type="text"
-              placeholder="Cari kota atau provinsi..."
+              placeholder="Cari kota tujuan..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className={cn(inputCls, "pl-10")}
@@ -190,19 +252,17 @@ export default function DestinationsPage() {
             <thead>
               <tr className="text-left text-xs uppercase tracking-wider text-surface-400 border-b border-surface-800 bg-surface-900/50">
                 <th className="px-4 py-3">Kota Tujuan</th>
-                <th className="px-4 py-3">Provinsi</th>
-                <th className="px-4 py-3">Jarak</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-800">
               {isLoading ? (
-                <tr><td colSpan={5} className="p-8 text-center text-surface-500">Memuat data...</td></tr>
+                <tr><td colSpan={3} className="p-8 text-center text-surface-500">Memuat data...</td></tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-surface-500">
-                    Belum ada kota tujuan. Tambahkan manual atau gunakan &quot;Impor Kota Bawaan&quot;.
+                  <td colSpan={3} className="p-8 text-center text-surface-500">
+                    Belum ada kota tujuan. Tambahkan manual, Import Excel, atau gunakan &quot;Impor Kota Bawaan&quot;.
                   </td>
                 </tr>
               ) : (
@@ -211,12 +271,6 @@ export default function DestinationsPage() {
                     <td className="px-4 py-3 font-semibold text-white">
                       <span className="inline-flex items-center gap-2"><MapPin className="w-3.5 h-3.5 text-brand-400" />{d.city}</span>
                       {d.notes && <p className="text-xs text-surface-500 font-normal ml-5">{d.notes}</p>}
-                    </td>
-                    <td className="px-4 py-3 text-surface-300">{d.province || "-"}</td>
-                    <td className="px-4 py-3 text-surface-300">
-                      {d.distance_km ? (
-                        <span className="inline-flex items-center gap-1"><Route className="w-3.5 h-3.5" />{d.distance_km} km</span>
-                      ) : "-"}
                     </td>
                     <td className="px-4 py-3">
                       <button
@@ -268,28 +322,6 @@ export default function DestinationsPage() {
                 onChange={(e) => setForm({ ...form, city: e.target.value })}
                 className={inputCls}
               />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className={labelCls}>Provinsi</label>
-                <input
-                  placeholder="Contoh: Jawa Barat"
-                  value={form.province}
-                  onChange={(e) => setForm({ ...form, province: e.target.value })}
-                  className={inputCls}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className={labelCls}>Jarak (km)</label>
-                <input
-                  type="number"
-                  min={0}
-                  value={form.distance_km}
-                  onChange={(e) => setForm({ ...form, distance_km: e.target.value })}
-                  className={inputCls}
-                />
-              </div>
             </div>
 
             <div className="space-y-1.5">
