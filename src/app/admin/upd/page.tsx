@@ -46,6 +46,9 @@ import {
 } from "@/lib/upd-calculator";
 import { INDONESIA_CITIES } from "@/lib/indonesia-cities";
 
+const HOURS_24 = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
+const MINUTES_60 = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"));
+
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export default function UpdCalculatorPage() {
@@ -83,10 +86,25 @@ export default function UpdCalculatorPage() {
   const [noSpd, setNoSpd] = useState("");
   const [notes, setNotes] = useState("");
 
-  // Default datetime: Berangkat hari ini jam 06:00, Pulang hari ini jam 20:00
+  // Format 24 Jam (00.00 s/d 23.59) tanpa AM/PM
   const todayStr = format(new Date(), "yyyy-MM-dd");
-  const [departureDateTime, setDepartureDateTime] = useState(`${todayStr}T06:00`);
-  const [returnDateTime, setReturnDateTime] = useState(`${todayStr}T20:00`);
+  const [departureDate, setDepartureDate] = useState(todayStr);
+  const [departureHour, setDepartureHour] = useState("06");
+  const [departureMinute, setDepartureMinute] = useState("00");
+
+  const [returnDate, setReturnDate] = useState(todayStr);
+  const [returnHour, setReturnHour] = useState("20");
+  const [returnMinute, setReturnMinute] = useState("00");
+
+  const departureDateTime = useMemo(
+    () => `${departureDate}T${departureHour}:${departureMinute}:00`,
+    [departureDate, departureHour, departureMinute]
+  );
+  const returnDateTime = useMemo(
+    () => `${returnDate}T${returnHour}:${returnMinute}:00`,
+    [returnDate, returnHour, returnMinute]
+  );
+
   const [cigaretteRate, setCigaretteRate] = useState<number>(DEFAULT_CIGARETTE_RATE);
 
   // Search helpers for dropdowns
@@ -217,17 +235,33 @@ export default function UpdCalculatorPage() {
     const dayAfter = format(new Date(now.getTime() + 48 * 60 * 60 * 1000), "yyyy-MM-dd");
 
     if (type === "today_half") {
-      setDepartureDateTime(`${today}T07:00`);
-      setReturnDateTime(`${today}T15:00`);
+      setDepartureDate(today);
+      setDepartureHour("07");
+      setDepartureMinute("00");
+      setReturnDate(today);
+      setReturnHour("15");
+      setReturnMinute("00");
     } else if (type === "today_full") {
-      setDepartureDateTime(`${today}T06:00`);
-      setReturnDateTime(`${today}T21:30`);
+      setDepartureDate(today);
+      setDepartureHour("06");
+      setDepartureMinute("00");
+      setReturnDate(today);
+      setReturnHour("21");
+      setReturnMinute("30");
     } else if (type === "twodays") {
-      setDepartureDateTime(`${today}T07:00`);
-      setReturnDateTime(`${tomorrow}T17:00`);
+      setDepartureDate(today);
+      setDepartureHour("07");
+      setDepartureMinute("00");
+      setReturnDate(tomorrow);
+      setReturnHour("17");
+      setReturnMinute("00");
     } else if (type === "threedays") {
-      setDepartureDateTime(`${today}T06:00`);
-      setReturnDateTime(`${dayAfter}T20:00`);
+      setDepartureDate(today);
+      setDepartureHour("06");
+      setDepartureMinute("00");
+      setReturnDate(dayAfter);
+      setReturnHour("20");
+      setReturnMinute("00");
     }
   };
 
@@ -330,11 +364,11 @@ export default function UpdCalculatorPage() {
       sheetData.push(["No. SPD", noSpd || "-"]);
       sheetData.push([
         "Waktu Berangkat",
-        departureDateTime ? format(new Date(departureDateTime), "dd/MM/yyyy HH:mm") : "-",
+        departureDateTime ? format(new Date(departureDateTime), "dd/MM/yyyy HH.mm") : "-",
       ]);
       sheetData.push([
         "Waktu Pulang",
-        returnDateTime ? format(new Date(returnDateTime), "dd/MM/yyyy HH:mm") : "-",
+        returnDateTime ? format(new Date(returnDateTime), "dd/MM/yyyy HH.mm") : "-",
       ]);
       sheetData.push(["Total Hari", `${calculationResult.totalDays} Hari`]);
       sheetData.push([]);
@@ -344,11 +378,11 @@ export default function UpdCalculatorPage() {
         "Tanggal",
         "Hari",
         "Status Hari",
-        "Ekstra (03:00)",
-        "Pagi (08:00)",
-        "Siang (12:00)",
-        "Malam (19:00)",
-        "Ekstra (21:00)",
+        "Ekstra (03.00)",
+        "Pagi (08.00)",
+        "Siang (12.00)",
+        "Malam (19.00)",
+        "Ekstra (21.00)",
         "Bermalam",
         "Uang Rokok",
         "Subtotal Harian",
@@ -701,37 +735,141 @@ export default function UpdCalculatorPage() {
                 )}
               </div>
 
-              {/* Tanggal & Jam Berangkat */}
-              <div>
-                <label className="block text-xs font-semibold text-brand-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                  <span>Waktu Berangkat <span className="text-red-400">*</span></span>
-                  <span className="text-[10px] text-surface-400 font-normal">Tgl & Jam</span>
+              {/* Tanggal & Jam Berangkat (Format 24 Jam: 00.00 - 23.59) */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-brand-300 uppercase tracking-wider flex items-center justify-between">
+                  <span>Keberangkatan <span className="text-red-400">*</span></span>
+                  <span className="text-[10px] text-brand-400 font-mono font-bold">
+                    Pukul {departureHour}.{departureMinute}
+                  </span>
                 </label>
-                <div className="relative">
-                  <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-400" />
-                  <input
-                    type="datetime-local"
-                    value={departureDateTime}
-                    onChange={(e) => setDepartureDateTime(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2.5 bg-surface-900 border border-brand-500/40 text-white rounded-xl focus:outline-none focus:border-brand-500 text-sm transition-colors"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-400" />
+                    <input
+                      type="date"
+                      value={departureDate}
+                      onChange={(e) => setDepartureDate(e.target.value)}
+                      className="w-full pl-9 pr-2 py-2.5 bg-surface-900 border border-brand-500/40 text-white rounded-xl focus:outline-none focus:border-brand-500 text-sm"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-1 bg-surface-900 border border-brand-500/40 rounded-xl px-2.5 py-1.5">
+                    <Clock className="w-3.5 h-3.5 text-brand-400 shrink-0" />
+                    <span className="text-[10px] text-surface-400 font-semibold uppercase">Jam</span>
+                    <select
+                      value={departureHour}
+                      onChange={(e) => setDepartureHour(e.target.value)}
+                      className="bg-surface-800 text-white font-mono font-bold text-xs px-1.5 py-1.5 rounded border border-surface-700 focus:outline-none focus:border-brand-500 cursor-pointer"
+                    >
+                      {HOURS_24.map((h) => (
+                        <option key={h} value={h}>{h}</option>
+                      ))}
+                    </select>
+                    <span className="font-bold text-surface-400">:</span>
+                    <select
+                      value={departureMinute}
+                      onChange={(e) => setDepartureMinute(e.target.value)}
+                      className="bg-surface-800 text-white font-mono font-bold text-xs px-1.5 py-1.5 rounded border border-surface-700 focus:outline-none focus:border-brand-500 cursor-pointer"
+                    >
+                      {MINUTES_60.map((m) => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                {/* Shortcut Jam Berangkat */}
+                <div className="flex items-center gap-1 text-[10px] text-surface-400 pt-0.5">
+                  <span className="shrink-0 text-[10px]">Cepat:</span>
+                  {["03.00", "06.00", "08.00", "12.00"].map((t) => {
+                    const [h, m] = t.split(".");
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => {
+                          setDepartureHour(h);
+                          setDepartureMinute(m);
+                        }}
+                        className={cn(
+                          "px-1.5 py-0.5 rounded font-mono text-[10px] transition-colors cursor-pointer",
+                          departureHour === h && departureMinute === m
+                            ? "bg-brand-500/30 text-brand-300 font-bold border border-brand-500/40"
+                            : "bg-surface-800 hover:bg-surface-700 text-surface-300"
+                        )}
+                      >
+                        {t}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Tanggal & Jam Pulang */}
-              <div>
-                <label className="block text-xs font-semibold text-brand-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                  <span>Waktu Kepulangan <span className="text-red-400">*</span></span>
-                  <span className="text-[10px] text-surface-400 font-normal">Tgl & Jam</span>
+              {/* Tanggal & Jam Pulang (Format 24 Jam: 00.00 - 23.59) */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-emerald-300 uppercase tracking-wider flex items-center justify-between">
+                  <span>Kepulangan <span className="text-red-400">*</span></span>
+                  <span className="text-[10px] text-emerald-400 font-mono font-bold">
+                    Pukul {returnHour}.{returnMinute}
+                  </span>
                 </label>
-                <div className="relative">
-                  <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400" />
-                  <input
-                    type="datetime-local"
-                    value={returnDateTime}
-                    onChange={(e) => setReturnDateTime(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2.5 bg-surface-900 border border-emerald-500/40 text-white rounded-xl focus:outline-none focus:border-emerald-500 text-sm transition-colors"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400" />
+                    <input
+                      type="date"
+                      value={returnDate}
+                      onChange={(e) => setReturnDate(e.target.value)}
+                      className="w-full pl-9 pr-2 py-2.5 bg-surface-900 border border-emerald-500/40 text-white rounded-xl focus:outline-none focus:border-emerald-500 text-sm"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-1 bg-surface-900 border border-emerald-500/40 rounded-xl px-2.5 py-1.5">
+                    <Clock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span className="text-[10px] text-surface-400 font-semibold uppercase">Jam</span>
+                    <select
+                      value={returnHour}
+                      onChange={(e) => setReturnHour(e.target.value)}
+                      className="bg-surface-800 text-white font-mono font-bold text-xs px-1.5 py-1.5 rounded border border-surface-700 focus:outline-none focus:border-emerald-500 cursor-pointer"
+                    >
+                      {HOURS_24.map((h) => (
+                        <option key={h} value={h}>{h}</option>
+                      ))}
+                    </select>
+                    <span className="font-bold text-surface-400">:</span>
+                    <select
+                      value={returnMinute}
+                      onChange={(e) => setReturnMinute(e.target.value)}
+                      className="bg-surface-800 text-white font-mono font-bold text-xs px-1.5 py-1.5 rounded border border-surface-700 focus:outline-none focus:border-emerald-500 cursor-pointer"
+                    >
+                      {MINUTES_60.map((m) => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                {/* Shortcut Jam Kepulangan */}
+                <div className="flex items-center gap-1 text-[10px] text-surface-400 pt-0.5">
+                  <span className="shrink-0 text-[10px]">Cepat:</span>
+                  {["12.00", "14.00", "17.00", "19.00", "21.00"].map((t) => {
+                    const [h, m] = t.split(".");
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => {
+                          setReturnHour(h);
+                          setReturnMinute(m);
+                        }}
+                        className={cn(
+                          "px-1.5 py-0.5 rounded font-mono text-[10px] transition-colors cursor-pointer",
+                          returnHour === h && returnMinute === m
+                            ? "bg-emerald-500/30 text-emerald-300 font-bold border border-emerald-500/40"
+                            : "bg-surface-800 hover:bg-surface-700 text-surface-300"
+                        )}
+                      >
+                        {t}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -919,11 +1057,11 @@ export default function UpdCalculatorPage() {
                         </p>
                         <p className="text-[10px] text-surface-400 leading-tight mt-0.5">
                           {idx === 0 && idx === calculationResult.days.length - 1
-                            ? `${format(new Date(departureDateTime), "HH:mm")} - ${format(new Date(returnDateTime), "HH:mm")}`
+                            ? `${format(new Date(departureDateTime), "HH.mm")} s/d ${format(new Date(returnDateTime), "HH.mm")} WIB`
                             : idx === 0
-                            ? `Mulai ${format(new Date(departureDateTime), "HH:mm")} WIB`
+                            ? `Mulai ${format(new Date(departureDateTime), "HH.mm")} WIB`
                             : idx === calculationResult.days.length - 1
-                            ? `Pulang ${format(new Date(returnDateTime), "HH:mm")} WIB`
+                            ? `Pulang ${format(new Date(returnDateTime), "HH.mm")} WIB`
                             : "Dinas 24 Jam"}
                         </p>
                       </div>
@@ -957,9 +1095,9 @@ export default function UpdCalculatorPage() {
                               ? "bg-brand-500/20 text-brand-300 border-brand-500/50 shadow-sm"
                               : "bg-surface-900/40 text-surface-500 border-surface-800/80 line-through opacity-50 hover:opacity-80"
                           )}
-                          title={`${meal.label} jam ${meal.timeStr} (${formatRupiah(meal.rate)})`}
+                          title={`${meal.label} pukul ${meal.timeStr.replace(":", ".")} (${formatRupiah(meal.rate)})`}
                         >
-                          <span className="font-mono text-[10px] opacity-75">{meal.timeStr}</span>
+                          <span className="font-mono text-[10px] opacity-75">{meal.timeStr.replace(":", ".")}</span>
                           <span className="font-semibold">{formatRupiah(meal.rate)}</span>
                         </button>
                       ))}
@@ -1084,13 +1222,13 @@ export default function UpdCalculatorPage() {
                         <div>
                           <span className="text-[10px] text-surface-500 uppercase font-semibold block">Berangkat</span>
                           <span className="text-surface-300">
-                            {format(new Date(item.departure_time), "dd/MM/yy HH:mm")}
+                            {format(new Date(item.departure_time), "dd/MM/yy HH.mm")}
                           </span>
                         </div>
                         <div>
                           <span className="text-[10px] text-surface-500 uppercase font-semibold block">Pulang</span>
                           <span className="text-surface-300">
-                            {format(new Date(item.return_time), "dd/MM/yy HH:mm")}
+                            {format(new Date(item.return_time), "dd/MM/yy HH.mm")}
                           </span>
                         </div>
                       </div>
@@ -1374,13 +1512,13 @@ export default function UpdCalculatorPage() {
               <div>
                 <p className="text-slate-500 uppercase font-bold text-[10px]">Jadwal Berangkat</p>
                 <p className="font-semibold text-slate-800">
-                  {printData.calc.departureTime ? format(new Date(printData.calc.departureTime), "EEEE, dd MMM yyyy HH:mm", { locale: localeId }) : "-"}
+                  {printData.calc.departureTime ? format(new Date(printData.calc.departureTime), "EEEE, dd MMM yyyy 'pukul' HH.mm 'WIB'", { locale: localeId }) : "-"}
                 </p>
               </div>
               <div>
                 <p className="text-slate-500 uppercase font-bold text-[10px]">Jadwal Kepulangan</p>
                 <p className="font-semibold text-slate-800">
-                  {printData.calc.returnTime ? format(new Date(printData.calc.returnTime), "EEEE, dd MMM yyyy HH:mm", { locale: localeId }) : "-"}
+                  {printData.calc.returnTime ? format(new Date(printData.calc.returnTime), "EEEE, dd MMM yyyy 'pukul' HH.mm 'WIB'", { locale: localeId }) : "-"}
                 </p>
               </div>
             </div>
@@ -1416,7 +1554,7 @@ export default function UpdCalculatorPage() {
                         <div className="space-y-1">
                           {day.meals.filter((m) => m.active).map((m) => (
                             <div key={m.key} className="flex justify-between gap-3 text-[11px]">
-                              <span>{m.label} ({m.timeStr})</span>
+                              <span>{m.label} ({m.timeStr.replace(":", ".")})</span>
                               <span className="font-medium text-slate-900">{formatRupiah(m.rate)}</span>
                             </div>
                           ))}
