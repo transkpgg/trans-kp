@@ -29,6 +29,7 @@ model User {
   etoll_histories EtollHistory[]
   driver_bons  DriverBon[]
   fuel_trips   FuelTripLog[]
+  upd_calculations UpdCalculation[]
 }
 
 model Branch {
@@ -265,5 +266,29 @@ model FuelAuditLog {
   new_value   String?  // JSON string nilai sesudah
   notes       String?  // Alasan / catatan audit
   timestamp   DateTime @default(now())
+}
+
+model UpdCalculation {
+  id                  String   @id @default(cuid())
+  driver_id           String?
+  driver_name         String
+  driver_nik          String?
+  nopol               String?
+  destination         String?
+  no_spd              String?
+  departure_time      DateTime
+  return_time         DateTime
+  total_days          Int      @default(1)
+  meal_allowance      Float    @default(0)
+  overnight_allowance Float    @default(0)
+  cigarette_allowance Float    @default(0)
+  total_amount        Float    @default(0)
+  daily_breakdown     String   // JSON string of daily breakdown details
+  notes               String?
+  created_by          String?
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+
+  driver              User?    @relation(fields: [driver_id], references: [id])
 }
 

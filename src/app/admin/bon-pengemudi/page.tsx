@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
 import { 
@@ -57,6 +58,8 @@ export default function BonPengemudiPage() {
   const [endDateFilter, setEndDateFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "lunas" | "belum_lunas">("all");
 
+  const searchParams = useSearchParams();
+
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBon, setEditingBon] = useState<any | null>(null);
@@ -77,6 +80,29 @@ export default function BonPengemudiPage() {
   const [signatureUrl, setSignatureUrl] = useState("");
   const [showSignaturePad, setShowSignaturePad] = useState(false);
   const [viewingSignatureUrl, setViewingSignatureUrl] = useState<string | null>(null);
+
+  // Handle prefill from UPD calculation
+  useEffect(() => {
+    const qAmount = searchParams.get("amount");
+    const qDriverName = searchParams.get("driver_name");
+    if (qAmount && qDriverName) {
+      setDriverName(qDriverName);
+      setDriverNik(searchParams.get("driver_nik") || "");
+      setSelectedDriverId(searchParams.get("driver_id") || "");
+      setNopol(searchParams.get("nopol") || "");
+      setDestination(searchParams.get("destination") || "");
+      setNoSpd(searchParams.get("no_spd") || "");
+      if (searchParams.get("departure_date")) {
+        setDepartureDate(searchParams.get("departure_date")!);
+      }
+      setNominalDisplay(formatCurrencyInput(qAmount));
+      if (searchParams.get("keterangan")) {
+        setKeterangan(searchParams.get("keterangan")!);
+      }
+      setIsModalOpen(true);
+      toast.info("Data dari Hitung UPD berhasil dimasukkan ke formulir Bon Pengemudi");
+    }
+  }, [searchParams]);
 
   // Search dropdown helpers
   const [citySearch, setCitySearch] = useState("");

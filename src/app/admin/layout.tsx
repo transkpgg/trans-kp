@@ -17,7 +17,8 @@ import {
   X,
   Bell,
   Database,
-  Fuel
+  Fuel,
+  Calculator
 } from "lucide-react";
 import { cn, getInitials } from "@/lib/utils";
 import { mockCurrentAdmin } from "@/lib/mock-data";
@@ -30,6 +31,7 @@ const adminNavItems = [
   { name: "Hotel Visit", href: "/admin/hotel-visits", icon: Building2 },
   { name: "E-Toll", href: "/admin/etoll", icon: CreditCard },
   { name: "Bon Pengemudi", href: "/admin/bon-pengemudi", icon: Receipt },
+  { name: "Hitung UPD", href: "/admin/upd", icon: Calculator },
   { name: "Laporan", href: "/admin/reports", icon: FileBarChart },
 ];
 
