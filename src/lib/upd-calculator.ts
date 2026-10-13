@@ -74,11 +74,13 @@ export interface DayMealItem {
   active: boolean;
 }
 
+export type DriverCategory = "organik" | "penunjang";
+
 export interface DayCalculation {
   dateStr: string; // "YYYY-MM-DD"
   formattedDate: string; // "Senin, 14 Okt 2024"
   dayName: string; // "Senin"
-  isHoliday: boolean; // default true for Saturday & Sunday
+  isHoliday: boolean; // default true for Sunday only (Saturday is workday)
   meals: DayMealItem[];
   overnight: {
     rate: number;
@@ -99,17 +101,22 @@ export interface UpdCalculationResult {
   totalOvernightAllowance: number;
   totalCigaretteAllowance: number;
   grandTotal: number;
+  driverCategory?: DriverCategory;
   days: DayCalculation[];
 }
 
 /**
  * Menghitung rincian UPD berdasarkan rentang tanggal-jam berangkat dan kepulangan
+ * Ketentuan:
+ * 1. Hari Sabtu TIDAK masuk hari libur tanggal merah (hari kerja biasa). Default libur hanya Minggu.
+ * 2. Kenaikan tarif tanggal merah HANYA berlaku untuk Pengemudi Organik. Pengemudi Penunjang tetap tarif hari kerja normal.
  */
 export function calculateUpd(
   departure: Date | string,
   arrival: Date | string,
   cigaretteRate: number = DEFAULT_CIGARETTE_RATE,
-  existingDaysConfig?: Partial<DayCalculation>[]
+  existingDaysConfig?: Partial<DayCalculation>[],
+  driverCategory: DriverCategory = "organik"
 ): UpdCalculationResult {
   const depDate = new Date(departure);
   const arrDate = new Date(arrival);
@@ -123,6 +130,7 @@ export function calculateUpd(
       totalOvernightAllowance: 0,
       totalCigaretteAllowance: 0,
       grandTotal: 0,
+      driverCategory,
       days: [],
     };
   }
@@ -140,7 +148,8 @@ export function calculateUpd(
     // Cek apakah ada konfigurasi tersimpan sebelumnya (misal user switch hari libur / uncheck makan)
     const prevConfig = existingDaysConfig?.find((d) => d.dateStr === dateStr);
 
-    const defaultIsHoliday = isWeekend(cur);
+    // Aturan: Hari Sabtu TIDAK masuk hari libur tanggal merah. Default libur HANYA hari Minggu (getDay() === 0)
+    const defaultIsHoliday = cur.getDay() === 0;
     const isHoliday = prevConfig !== undefined && typeof prevConfig.isHoliday === "boolean" 
       ? prevConfig.isHoliday 
       : defaultIsHoliday;
@@ -152,10 +161,13 @@ export function calculateUpd(
     const startHour = isFirstDay ? depDate.getHours() + depDate.getMinutes() / 60 : 0;
     const endHour = isLastDay ? arrDate.getHours() + arrDate.getMinutes() / 60 : 24;
 
+    // Untuk tanggal merah tidak termasuk pengemudi penunjang, tapi untuk pengemudi organik
+    const isHolidayForDriver = isHoliday && driverCategory === "organik";
+
     // Evaluasi 5 slot makan
     const meals: DayMealItem[] = MEAL_SLOT_DEFS.map((slot) => {
       const slotHour = slot.hour + slot.minute / 60;
-      const rate = isHoliday ? slot.holidayRate : slot.workdayRate;
+      const rate = isHolidayForDriver ? slot.holidayRate : slot.workdayRate;
 
       // Apakah secara otomatis tercakup dalam jam dinas
       const autoActive = startHour <= slotHour && endHour >= slotHour;
@@ -179,7 +191,7 @@ export function calculateUpd(
     });
 
     // Evaluasi Bermalam (B)
-    const overnightRate = isHoliday ? OVERNIGHT_RATES.holiday : OVERNIGHT_RATES.workday;
+    const overnightRate = isHolidayForDriver ? OVERNIGHT_RATES.holiday : OVERNIGHT_RATES.workday;
     // Otomatis aktif jika dinas berlanjut ke hari berikutnya (bukan hari terakhir)
     const autoOvernight = !isLastDay;
     let overnightActive = autoOvernight;
@@ -244,6 +256,7 @@ export function calculateUpd(
     totalOvernightAllowance,
     totalCigaretteAllowance,
     grandTotal,
+    driverCategory,
     days,
   };
 }

@@ -40,6 +40,7 @@ import {
   calculateUpd,
   DayCalculation,
   UpdCalculationResult,
+  DriverCategory,
   DEFAULT_CIGARETTE_RATE,
   MEAL_SLOT_DEFS,
   OVERNIGHT_RATES
@@ -112,6 +113,7 @@ export default function UpdCalculatorPage() {
   const [driverNik, setDriverNik] = useState("");
   const [nopol, setNopol] = useState("");
   const [destination, setDestination] = useState("");
+  const [driverCategory, setDriverCategory] = useState<DriverCategory>("organik");
   const [noSpd, setNoSpd] = useState("");
   const [notes, setNotes] = useState("");
 
@@ -189,17 +191,17 @@ export default function UpdCalculatorPage() {
 
   const [isSaving, setIsSaving] = useState(false);
 
-  // Recalculate whenever departure or return changes
+  // Recalculate whenever departure, return, cigaretteRate, or driverCategory changes
   useEffect(() => {
     if (!departureDateTime || !returnDateTime) return;
-    const res = calculateUpd(departureDateTime, returnDateTime, cigaretteRate);
+    const res = calculateUpd(departureDateTime, returnDateTime, cigaretteRate, undefined, driverCategory);
     setCustomDaysConfig(res.days);
-  }, [departureDateTime, returnDateTime, cigaretteRate]);
+  }, [departureDateTime, returnDateTime, cigaretteRate, driverCategory]);
 
   // Derived calculation based on current customized days state
   const calculationResult: UpdCalculationResult = useMemo(() => {
-    return calculateUpd(departureDateTime, returnDateTime, cigaretteRate, customDaysConfig);
-  }, [departureDateTime, returnDateTime, cigaretteRate, customDaysConfig]);
+    return calculateUpd(departureDateTime, returnDateTime, cigaretteRate, customDaysConfig, driverCategory);
+  }, [departureDateTime, returnDateTime, cigaretteRate, customDaysConfig, driverCategory]);
 
   // Handler toggle holiday on a specific day
   const handleToggleHoliday = (dateStr: string) => {
@@ -207,6 +209,7 @@ export default function UpdCalculatorPage() {
       prev.map((day) => {
         if (day.dateStr === dateStr) {
           const nextHoliday = !day.isHoliday;
+          const isHolidayForDriver = nextHoliday && driverCategory === "organik";
           return {
             ...day,
             isHoliday: nextHoliday,
@@ -215,16 +218,92 @@ export default function UpdCalculatorPage() {
               const def = MEAL_SLOT_DEFS.find((d) => d.key === m.key);
               return {
                 ...m,
-                rate: nextHoliday ? (def?.holidayRate || m.rate) : (def?.workdayRate || m.rate),
+                rate: isHolidayForDriver ? (def?.holidayRate || m.rate) : (def?.workdayRate || m.rate),
               };
             }),
             overnight: {
               ...day.overnight,
-              rate: nextHoliday ? OVERNIGHT_RATES.holiday : OVERNIGHT_RATES.workday,
+              rate: isHolidayForDriver ? OVERNIGHT_RATES.holiday : OVERNIGHT_RATES.workday,
             },
           };
         }
         return day;
+      })
+    );
+  };
+
+  // Set Semua Hari Jadi Tanggal Merah (cth: Libur Panjang Idul Fitri / Tahun Baru)
+  const handleSetAllHolidays = () => {
+    setCustomDaysConfig((prev) =>
+      prev.map((day) => {
+        const isHolidayForDriver = driverCategory === "organik";
+        return {
+          ...day,
+          isHoliday: true,
+          meals: day.meals.map((m) => {
+            const def = MEAL_SLOT_DEFS.find((d) => d.key === m.key);
+            return {
+              ...m,
+              rate: isHolidayForDriver ? (def?.holidayRate || m.rate) : (def?.workdayRate || m.rate),
+            };
+          }),
+          overnight: {
+            ...day.overnight,
+            rate: isHolidayForDriver ? OVERNIGHT_RATES.holiday : OVERNIGHT_RATES.workday,
+          },
+        };
+      })
+    );
+    toast.success("Semua hari berhasil diatur sebagai Tanggal Merah (Libur Panjang)");
+  };
+
+  // Reset Tanggal Merah Standar (Hanya Minggu libur, Sabtu kerja)
+  const handleResetHolidays = () => {
+    setCustomDaysConfig((prev) =>
+      prev.map((day) => {
+        const d = new Date(day.dateStr);
+        const standardHoliday = d.getDay() === 0; // Hanya Minggu libur
+        const isHolidayForDriver = standardHoliday && driverCategory === "organik";
+        return {
+          ...day,
+          isHoliday: standardHoliday,
+          meals: day.meals.map((m) => {
+            const def = MEAL_SLOT_DEFS.find((d) => d.key === m.key);
+            return {
+              ...m,
+              rate: isHolidayForDriver ? (def?.holidayRate || m.rate) : (def?.workdayRate || m.rate),
+            };
+          }),
+          overnight: {
+            ...day.overnight,
+            rate: isHolidayForDriver ? OVERNIGHT_RATES.holiday : OVERNIGHT_RATES.workday,
+          },
+        };
+      })
+    );
+    toast.success("Tanggal merah di-reset ke standar (Minggu libur, Sabtu kerja)");
+  };
+
+  // Handler switch kategori pengemudi (Organik vs Penunjang)
+  const handleSetDriverCategory = (cat: DriverCategory) => {
+    setDriverCategory(cat);
+    setCustomDaysConfig((prev) =>
+      prev.map((day) => {
+        const isHolidayForDriver = day.isHoliday && cat === "organik";
+        return {
+          ...day,
+          meals: day.meals.map((m) => {
+            const def = MEAL_SLOT_DEFS.find((d) => d.key === m.key);
+            return {
+              ...m,
+              rate: isHolidayForDriver ? (def?.holidayRate || m.rate) : (def?.workdayRate || m.rate),
+            };
+          }),
+          overnight: {
+            ...day.overnight,
+            rate: isHolidayForDriver ? OVERNIGHT_RATES.holiday : OVERNIGHT_RATES.workday,
+          },
+        };
       })
     );
   };
@@ -422,6 +501,12 @@ export default function UpdCalculatorPage() {
       sheetData.push([]);
       sheetData.push(["Pengemudi", driverName || "-"]);
       sheetData.push(["NIK", driverNik || "-"]);
+      sheetData.push([
+        "Kategori",
+        driverCategory === "organik"
+          ? "Pengemudi Organik (Tarif Libur Aktif)"
+          : "Pengemudi Penunjang (Tarif Normal Hari Kerja)",
+      ]);
       sheetData.push(["No. Polisi", nopol || "-"]);
       sheetData.push(["Tujuan", destination || "-"]);
       sheetData.push(["No. SPD", noSpd || "-"]);
@@ -700,6 +785,11 @@ export default function UpdCalculatorPage() {
                             setDriverNik(d.nik);
                             setDriverSearch(d.full_name);
                             setIsDriverDropdownOpen(false);
+                            if (d.jabatan?.toLowerCase().includes("penunjang")) {
+                              handleSetDriverCategory("penunjang");
+                            } else if (d.jabatan?.toLowerCase().includes("organik")) {
+                              handleSetDriverCategory("organik");
+                            }
                           }}
                           className="w-full text-left px-3.5 py-2.5 text-sm text-surface-200 hover:bg-slate-800 hover:text-white flex items-center justify-between transition-colors"
                         >
@@ -991,6 +1081,55 @@ export default function UpdCalculatorPage() {
                 </div>
               </div>
 
+              {/* Kategori Pengemudi (Organik vs Penunjang) */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-surface-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                  <span>Kategori Pengemudi <span className="text-red-400">*</span></span>
+                  <span className="text-[10px] font-mono font-bold text-amber-400">
+                    {driverCategory === "organik" ? "Tarif Libur Aktif" : "Tarif Normal Flat"}
+                  </span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleSetDriverCategory("organik")}
+                    className={cn(
+                      "py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer",
+                      driverCategory === "organik"
+                        ? "bg-brand-500/20 border-brand-500 text-brand-300 shadow-sm ring-1 ring-brand-500/50"
+                        : "bg-surface-900 border-surface-700 text-surface-400 hover:text-white hover:bg-surface-800"
+                    )}
+                  >
+                    <CheckCircle2 className={cn("w-3.5 h-3.5", driverCategory === "organik" ? "text-brand-400" : "hidden")} />
+                    Pengemudi Organik
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSetDriverCategory("penunjang")}
+                    className={cn(
+                      "py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer",
+                      driverCategory === "penunjang"
+                        ? "bg-amber-500/20 border-amber-500 text-amber-300 shadow-sm ring-1 ring-amber-500/50"
+                        : "bg-surface-900 border-surface-700 text-surface-400 hover:text-white hover:bg-surface-800"
+                    )}
+                  >
+                    <CheckCircle2 className={cn("w-3.5 h-3.5", driverCategory === "penunjang" ? "text-amber-400" : "hidden")} />
+                    Pengemudi Penunjang
+                  </button>
+                </div>
+                <p className="text-[11px] text-surface-400 leading-tight">
+                  {driverCategory === "organik" ? (
+                    <span className="text-brand-400 font-medium">
+                      ✓ Organik: Hari libur / tanggal merah dapat tarif dobel (Rp 40.000 / Rp 50.000).
+                    </span>
+                  ) : (
+                    <span className="text-amber-400 font-medium">
+                      ℹ Penunjang: Tanggal merah tetap tarif normal hari kerja (Rp 20.000 / Rp 25.000).
+                    </span>
+                  )}
+                </p>
+              </div>
+
               {/* Jatah Uang Rokok */}
               <div>
                 <label className="block text-xs font-semibold text-surface-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
@@ -1138,14 +1277,33 @@ export default function UpdCalculatorPage() {
 
           {/* Compact Daily Breakdown Section */}
           <div className="space-y-2.5">
-            <div className="flex items-center justify-between text-xs px-1">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs px-1">
               <span className="font-bold text-white flex items-center gap-1.5">
                 <Calendar className="w-4 h-4 text-brand-400" />
-                Rincian Jadwal Makan ({calculationResult.totalDays} Hari)
+                Rincian Jadwal Dinas ({calculationResult.totalDays} Hari)
               </span>
-              <span className="text-[11px] text-surface-400 hidden sm:inline">
-                Klik tombol jam makan / inap / rokok di bawah untuk aktifkan atau nonaktifkan
-              </span>
+
+              {/* Set Tombol Tanggal Merah Manual (Libur Panjang Idul Fitri / Tahun Baru) */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleSetAllHolidays}
+                  className="px-2.5 py-1 rounded-lg bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/30 text-[11px] font-semibold flex items-center gap-1 transition-all cursor-pointer"
+                  title="Atur semua hari dalam dinas ini menjadi Tanggal Merah (cth: Libur Panjang Idul Fitri / Tahun Baru)"
+                >
+                  <Sparkles className="w-3 h-3 text-red-400" />
+                  Set Semua Tanggal Merah (Libur Idul Fitri / Thn Baru)
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetHolidays}
+                  className="px-2.5 py-1 rounded-lg bg-surface-800 hover:bg-surface-700 text-surface-300 border border-surface-700 text-[11px] font-medium flex items-center gap-1 transition-all cursor-pointer"
+                  title="Kembalikan ke standar: Hanya Minggu libur, Sabtu & hari biasa adalah hari kerja"
+                >
+                  <RotateCcw className="w-3 h-3 text-surface-400" />
+                  Reset Standar (Sabtu Kerja)
+                </button>
+              </div>
             </div>
 
             {calculationResult.days.length === 0 ? (
@@ -1184,21 +1342,36 @@ export default function UpdCalculatorPage() {
                         </p>
                       </div>
 
-                      {/* Holiday Toggle */}
+                      {/* Holiday Toggle Button */}
                       <button
                         type="button"
                         onClick={() => handleToggleHoliday(day.dateStr)}
                         className={cn(
-                          "ml-auto md:ml-1 px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all border cursor-pointer",
+                          "ml-auto md:ml-1 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all border cursor-pointer flex items-center gap-1",
                           day.isHoliday
-                            ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
-                            : "bg-surface-800 text-surface-300 border-surface-700 hover:text-white"
+                            ? "bg-red-500/20 text-red-300 border-red-500/40 hover:bg-red-500/30 shadow-sm"
+                            : "bg-surface-800 text-surface-300 border-surface-700 hover:text-white hover:bg-surface-750"
                         )}
-                        title="Klik untuk ganti Hari Kerja / Libur"
+                        title="Klik untuk ubah status hari ini (Hari Kerja biasa vs Tanggal Merah Libur)"
                       >
-                        {day.isHoliday ? "🏖️ Libur" : "🏢 Kerja"}
+                        {day.isHoliday ? "🔴 Tanggal Merah" : "🏢 Hari Kerja"}
                       </button>
                     </div>
+
+                    {/* Badge Indikator Kategori Pengemudi jika Hari Libur */}
+                    {day.isHoliday && (
+                      <div className="px-2 py-0.5 rounded text-[10px] font-medium border hidden lg:block">
+                        {driverCategory === "organik" ? (
+                          <span className="text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded border border-red-500/20">
+                            Tarif Libur 2x (Organik)
+                          </span>
+                        ) : (
+                          <span className="text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                            Tarif Normal (Penunjang)
+                          </span>
+                        )}
+                      </div>
+                    )}
 
                     {/* Compact Interactive Chips for Meals, Overnight, Cigarette */}
                     <div className="flex flex-wrap items-center gap-1.5 flex-1 justify-start md:justify-center">
@@ -1375,6 +1548,7 @@ export default function UpdCalculatorPage() {
                                 totalOvernightAllowance: item.overnight_allowance,
                                 totalCigaretteAllowance: item.cigarette_allowance,
                                 grandTotal: item.total_amount,
+                                driverCategory: item.notes?.includes("Penunjang") ? "penunjang" : "organik",
                                 days: parsedDays || [],
                               },
                               driverName: item.driver_name,
@@ -1512,15 +1686,18 @@ export default function UpdCalculatorPage() {
             {/* Tabel 2: Hari Libur */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <h4 className="text-sm font-bold text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-purple-400" />
-                  2. Hari Libur
+                <h4 className="text-sm font-bold text-red-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-red-400" />
+                  2. Hari Libur / Tanggal Merah (Khusus Pengemudi Organik)
                 </h4>
-                <span className="text-[11px] text-surface-400">Sabtu, Minggu & Tanggal Merah</span>
+                <span className="text-[11px] text-surface-400">Minggu & Tanggal Merah (Sabtu Hari Kerja Normal)</span>
               </div>
+              <p className="text-[11px] text-amber-300 bg-amber-500/10 p-2 rounded-lg border border-amber-500/20">
+                <strong>Catatan Penting:</strong> Tarif hari libur hanya berlaku untuk <u>Pengemudi Organik</u>. Untuk <u>Pengemudi Penunjang</u>, perjalanan dinas pada hari libur / tanggal merah tetap diperhitungkan menggunakan tarif Hari Kerja normal.
+              </p>
               <div className="overflow-x-auto rounded-xl border border-surface-800">
                 <table className="w-full text-xs text-left">
-                  <thead className="bg-surface-850 text-surface-300 font-semibold uppercase border-b border-surface-800">
+                  <thead className="bg-[#0f172a] text-surface-300 font-semibold uppercase border-b border-surface-800">
                     <tr>
                       <th className="px-4 py-2.5">Waktu Makan</th>
                       <th className="px-4 py-2.5">Jam Makan</th>
@@ -1531,27 +1708,27 @@ export default function UpdCalculatorPage() {
                     <tr>
                       <td className="px-4 py-2 font-medium">Ekstra (E)</td>
                       <td className="px-4 py-2 font-mono">03.00</td>
-                      <td className="px-4 py-2 text-right font-bold text-purple-300">Rp 40.000</td>
+                      <td className="px-4 py-2 text-right font-bold text-red-300">Rp 40.000</td>
                     </tr>
                     <tr>
                       <td className="px-4 py-2 font-medium">Pagi (P)</td>
                       <td className="px-4 py-2 font-mono">08.00</td>
-                      <td className="px-4 py-2 text-right font-bold text-purple-300">Rp 50.000</td>
+                      <td className="px-4 py-2 text-right font-bold text-red-300">Rp 50.000</td>
                     </tr>
                     <tr>
                       <td className="px-4 py-2 font-medium">Siang (S)</td>
                       <td className="px-4 py-2 font-mono">12.00</td>
-                      <td className="px-4 py-2 text-right font-bold text-purple-300">Rp 50.000</td>
+                      <td className="px-4 py-2 text-right font-bold text-red-300">Rp 50.000</td>
                     </tr>
                     <tr>
                       <td className="px-4 py-2 font-medium">Malam (M)</td>
                       <td className="px-4 py-2 font-mono">19.00</td>
-                      <td className="px-4 py-2 text-right font-bold text-purple-300">Rp 50.000</td>
+                      <td className="px-4 py-2 text-right font-bold text-red-300">Rp 50.000</td>
                     </tr>
                     <tr>
                       <td className="px-4 py-2 font-medium">Ekstra (E)</td>
                       <td className="px-4 py-2 font-mono">21.00</td>
-                      <td className="px-4 py-2 text-right font-bold text-purple-300">Rp 40.000</td>
+                      <td className="px-4 py-2 text-right font-bold text-red-300">Rp 40.000</td>
                     </tr>
                     <tr className="bg-surface-900/40">
                       <td className="px-4 py-2 font-semibold text-amber-300">Bermalam (B)</td>
