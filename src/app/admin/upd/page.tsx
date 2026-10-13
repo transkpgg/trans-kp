@@ -107,12 +107,36 @@ export default function UpdCalculatorPage() {
 
   const [cigaretteRate, setCigaretteRate] = useState<number>(DEFAULT_CIGARETTE_RATE);
 
-  // Search helpers for dropdowns
+  // Search helpers & refs for dropdowns
   const [driverSearch, setDriverSearch] = useState("");
   const [isDriverDropdownOpen, setIsDriverDropdownOpen] = useState(false);
+  const driverDropdownRef = useRef<HTMLDivElement>(null);
+
+  const [vehicleSearch, setVehicleSearch] = useState("");
+  const [isVehicleDropdownOpen, setIsVehicleDropdownOpen] = useState(false);
+  const vehicleDropdownRef = useRef<HTMLDivElement>(null);
 
   const [citySearch, setCitySearch] = useState("");
   const [isCityDropdownOpen, setIsCityDropdownOpen] = useState(false);
+  const cityDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (driverDropdownRef.current && !driverDropdownRef.current.contains(target)) {
+        setIsDriverDropdownOpen(false);
+      }
+      if (vehicleDropdownRef.current && !vehicleDropdownRef.current.contains(target)) {
+        setIsVehicleDropdownOpen(false);
+      }
+      if (cityDropdownRef.current && !cityDropdownRef.current.contains(target)) {
+        setIsCityDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Custom/Modified Days Configuration State for the active calculation
   const [customDaysConfig, setCustomDaysConfig] = useState<DayCalculation[]>([]);
@@ -440,6 +464,16 @@ export default function UpdCalculatorPage() {
     );
   }, [users, driverSearch]);
 
+  // Filtered vehicles for search
+  const filteredVehicles = useMemo(() => {
+    if (!vehicleSearch) return vehicles;
+    return vehicles.filter(
+      (v: any) =>
+        v.nopol?.toLowerCase().includes(vehicleSearch.toLowerCase()) ||
+        v.name?.toLowerCase().includes(vehicleSearch.toLowerCase())
+    );
+  }, [vehicles, vehicleSearch]);
+
   // Filtered cities for search
   const filteredCities = useMemo(() => {
     if (!citySearch) return masterCities;
@@ -580,7 +614,7 @@ export default function UpdCalculatorPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {/* Pengemudi Dropdown */}
-              <div className="relative">
+              <div ref={driverDropdownRef} className="relative">
                 <label className="block text-xs font-semibold text-surface-300 uppercase tracking-wider mb-1.5">
                   Pengemudi <span className="text-red-400">*</span>
                 </label>
@@ -605,6 +639,7 @@ export default function UpdCalculatorPage() {
                         setDriverName("");
                         setDriverNik("");
                         setSelectedDriverId("");
+                        setDriverSearch("");
                       }}
                       className="absolute right-2.5 top-1/2 -translate-y-1/2 text-surface-400 hover:text-white"
                     >
@@ -614,49 +649,44 @@ export default function UpdCalculatorPage() {
                 </div>
 
                 {isDriverDropdownOpen && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-30"
-                      onClick={() => setIsDriverDropdownOpen(false)}
-                    />
-                    <div className="absolute z-40 w-full mt-1.5 bg-surface-850 border border-surface-700 rounded-xl shadow-xl max-h-56 overflow-y-auto py-1">
-                      {filteredDrivers.length > 0 ? (
-                        filteredDrivers.map((d: any) => (
-                          <button
-                            key={d.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedDriverId(d.id);
-                              setDriverName(d.full_name);
-                              setDriverNik(d.nik);
-                              setIsDriverDropdownOpen(false);
-                            }}
-                            className="w-full text-left px-3.5 py-2 text-sm text-surface-200 hover:bg-surface-750 hover:text-white flex items-center justify-between transition-colors"
-                          >
-                            <div>
-                              <p className="font-medium">{d.full_name}</p>
-                              <p className="text-[11px] text-surface-400">NIK: {d.nik}</p>
-                            </div>
-                            <span className="text-[10px] uppercase font-bold text-brand-400 px-2 py-0.5 rounded bg-brand-500/10">
-                              {d.jabatan || d.role}
-                            </span>
-                          </button>
-                        ))
-                      ) : (
-                        <div className="px-3 py-2 text-xs text-surface-400 text-center">
-                          Pengemudi tidak ditemukan. Ketik nama manual.
-                        </div>
-                      )}
-                    </div>
-                  </>
+                  <div className="absolute z-50 left-0 right-0 mt-1.5 bg-[#0f172a] border border-slate-700 rounded-xl shadow-2xl shadow-black max-h-56 overflow-y-auto py-1 divide-y divide-slate-800/60">
+                    {filteredDrivers.length > 0 ? (
+                      filteredDrivers.map((d: any) => (
+                        <button
+                          key={d.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedDriverId(d.id);
+                            setDriverName(d.full_name);
+                            setDriverNik(d.nik);
+                            setDriverSearch(d.full_name);
+                            setIsDriverDropdownOpen(false);
+                          }}
+                          className="w-full text-left px-3.5 py-2.5 text-sm text-surface-200 hover:bg-slate-800 hover:text-white flex items-center justify-between transition-colors"
+                        >
+                          <div>
+                            <p className="font-medium text-white">{d.full_name}</p>
+                            <p className="text-[11px] text-surface-400">NIK: {d.nik}</p>
+                          </div>
+                          <span className="text-[10px] uppercase font-bold text-brand-400 px-2 py-0.5 rounded bg-brand-500/10 border border-brand-500/20">
+                            {d.jabatan || d.role}
+                          </span>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-3.5 py-3 text-xs text-surface-400 text-center">
+                        Pengemudi tidak ditemukan. Ketik nama manual.
+                      </div>
+                    )}
+                  </div>
                 )}
                 {driverNik && (
                   <p className="text-[11px] text-surface-400 mt-1">NIK: {driverNik}</p>
                 )}
               </div>
 
-              {/* Nopol Kendaraan */}
-              <div>
+              {/* Nopol Kendaraan Dropdown */}
+              <div ref={vehicleDropdownRef} className="relative">
                 <label className="block text-xs font-semibold text-surface-300 uppercase tracking-wider mb-1.5">
                   Nomor Polisi (Kendaraan)
                 </label>
@@ -664,24 +694,67 @@ export default function UpdCalculatorPage() {
                   <Car className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-500" />
                   <input
                     type="text"
-                    placeholder="Contoh: B 1234 ABC"
+                    placeholder="Pilih atau ketik nopol..."
                     value={nopol}
-                    onChange={(e) => setNopol(e.target.value.toUpperCase())}
-                    list="vehicle-list"
-                    className="w-full pl-9 pr-3 py-2.5 bg-surface-900 border border-surface-700 text-white rounded-xl focus:outline-none focus:border-brand-500 text-sm font-mono uppercase transition-colors"
+                    onChange={(e) => {
+                      const val = e.target.value.toUpperCase();
+                      setNopol(val);
+                      setVehicleSearch(val);
+                      setIsVehicleDropdownOpen(true);
+                    }}
+                    onFocus={() => setIsVehicleDropdownOpen(true)}
+                    className="w-full pl-9 pr-8 py-2.5 bg-surface-900 border border-surface-700 text-white rounded-xl focus:outline-none focus:border-brand-500 text-sm font-mono uppercase transition-colors"
                   />
-                  <datalist id="vehicle-list">
-                    {vehicles.map((v: any) => (
-                      <option key={v.id} value={v.nopol}>
-                        {v.nopol} - {v.name}
-                      </option>
-                    ))}
-                  </datalist>
+                  {nopol && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNopol("");
+                        setVehicleSearch("");
+                      }}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-surface-400 hover:text-white"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
+
+                {isVehicleDropdownOpen && (
+                  <div className="absolute z-50 left-0 right-0 mt-1.5 bg-[#0f172a] border border-slate-700 rounded-xl shadow-2xl shadow-black max-h-56 overflow-y-auto py-1 divide-y divide-slate-800/60">
+                    {filteredVehicles.length > 0 ? (
+                      filteredVehicles.map((v: any) => (
+                        <button
+                          key={v.id}
+                          type="button"
+                          onClick={() => {
+                            setNopol(v.nopol);
+                            setVehicleSearch(v.nopol);
+                            setIsVehicleDropdownOpen(false);
+                          }}
+                          className="w-full text-left px-3.5 py-2.5 text-sm text-surface-200 hover:bg-slate-800 hover:text-white flex items-center justify-between transition-colors"
+                        >
+                          <div>
+                            <p className="font-mono font-bold text-white text-sm">{v.nopol}</p>
+                            <p className="text-[11px] text-surface-400">{v.name || v.brand || "Kendaraan"}</p>
+                          </div>
+                          {v.type && (
+                            <span className="text-[10px] uppercase font-semibold text-surface-400 px-2 py-0.5 rounded bg-surface-800 border border-surface-700">
+                              {v.type}
+                            </span>
+                          )}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-3.5 py-3 text-xs text-surface-400 text-center">
+                        Kendaraan tidak ditemukan dalam daftar. Tetap gunakan nopol yang diketik.
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
-              {/* Destinasi / Kota */}
-              <div className="relative">
+              {/* Destinasi / Kota Dropdown */}
+              <div ref={cityDropdownRef} className="relative">
                 <label className="block text-xs font-semibold text-surface-300 uppercase tracking-wider mb-1.5">
                   Kota Tujuan / Destinasi
                 </label>
@@ -702,7 +775,10 @@ export default function UpdCalculatorPage() {
                   {destination && (
                     <button
                       type="button"
-                      onClick={() => setDestination("")}
+                      onClick={() => {
+                        setDestination("");
+                        setCitySearch("");
+                      }}
                       className="absolute right-2.5 top-1/2 -translate-y-1/2 text-surface-400 hover:text-white"
                     >
                       <X className="w-3.5 h-3.5" />
@@ -711,27 +787,28 @@ export default function UpdCalculatorPage() {
                 </div>
 
                 {isCityDropdownOpen && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-30"
-                      onClick={() => setIsCityDropdownOpen(false)}
-                    />
-                    <div className="absolute z-40 w-full mt-1.5 bg-surface-850 border border-surface-700 rounded-xl shadow-xl max-h-52 overflow-y-auto py-1">
-                      {filteredCities.slice(0, 30).map((city) => (
+                  <div className="absolute z-50 left-0 right-0 mt-1.5 bg-[#0f172a] border border-slate-700 rounded-xl shadow-2xl shadow-black max-h-52 overflow-y-auto py-1 divide-y divide-slate-800/60">
+                    {filteredCities.length > 0 ? (
+                      filteredCities.slice(0, 30).map((city) => (
                         <button
                           key={city}
                           type="button"
                           onClick={() => {
                             setDestination(city);
+                            setCitySearch(city);
                             setIsCityDropdownOpen(false);
                           }}
-                          className="w-full text-left px-3.5 py-2 text-sm text-surface-200 hover:bg-surface-750 hover:text-white flex items-center justify-between"
+                          className="w-full text-left px-3.5 py-2.5 text-sm text-surface-200 hover:bg-slate-800 hover:text-white flex items-center justify-between transition-colors"
                         >
-                          <span>{city}</span>
+                          <span className="font-medium text-white">{city}</span>
                         </button>
-                      ))}
-                    </div>
-                  </>
+                      ))
+                    ) : (
+                      <div className="px-3.5 py-3 text-xs text-surface-400 text-center">
+                        Kota tidak ada di master. Tetap gunakan tujuan yang diketik.
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 
