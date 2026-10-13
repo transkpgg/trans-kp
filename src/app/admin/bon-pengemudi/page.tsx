@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
@@ -37,7 +37,7 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 const KETERANGAN_OPTIONS = ["Antar", "Jemput", "Pergi Pulang", "Inap"];
 
-export default function BonPengemudiPage() {
+function BonPengemudiContent() {
   const { data: bonData, mutate: mutateBons, isLoading: isBonsLoading } = useSWR("/api/driver-bon", fetcher);
   const { data: userData } = useSWR("/api/users", fetcher);
   const { data: vehicleData } = useSWR("/api/vehicles", fetcher);
@@ -1019,5 +1019,13 @@ export default function BonPengemudiPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function BonPengemudiPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-surface-400">Memuat data bon pengemudi...</div>}>
+      <BonPengemudiContent />
+    </Suspense>
   );
 }
