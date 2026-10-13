@@ -121,6 +121,164 @@ const parseTimeInput = (val: string): { hour: string; minute: string; formatted:
   return { hour: hourStr, minute: minStr, formatted: `${hourStr}.${minStr}` };
 };
 
+// Jarak rata-rata jalan raya (KM) dari Lokasi Aplikasi (Kantor Pusat Surabaya PT TRANS KP) ke kota-kota di Indonesia
+const CITY_DISTANCES_FROM_BASE: Record<string, number> = {
+  // Wilayah Surabaya & Sekitarnya
+  "surabaya": 15,
+  "sidoarjo": 28,
+  "gresik": 32,
+  "mojokerto": 52,
+  "pasuruan": 65,
+  "lamongan": 48,
+  "bangkalan": 35,
+
+  // Jawa Timur Lainnya
+  "malang": 92,
+  "batu": 105,
+  "probolinggo": 105,
+  "lumajang": 145,
+  "jember": 195,
+  "bondowoso": 182,
+  "situbondo": 188,
+  "banyuwangi": 290,
+  "jombang": 78,
+  "kediri": 122,
+  "blitar": 155,
+  "tulungagung": 150,
+  "trenggalek": 180,
+  "nganjuk": 110,
+  "madiun": 165,
+  "magetan": 185,
+  "ngawi": 180,
+  "bojonegoro": 108,
+  "tuban": 102,
+  "pacitan": 270,
+  "sampang": 85,
+  "pamekasan": 115,
+  "sumenep": 165,
+
+  // Jawa Tengah & DIY
+  "solo": 255,
+  "surakarta": 255,
+  "surakarta (solo)": 255,
+  "semarang": 345,
+  "salatiga": 300,
+  "magelang": 335,
+  "yogyakarta": 325,
+  "jogja": 325,
+  "sleman": 320,
+  "bantul": 330,
+  "klaten": 285,
+  "boyolali": 270,
+  "sragen": 230,
+  "karanganyar": 265,
+  "wonogiri": 290,
+  "sukoharjo": 265,
+  "kudus": 290,
+  "pati": 265,
+  "rembang": 205,
+  "blora": 160,
+  "cepu": 135,
+  "demak": 320,
+  "kendal": 370,
+  "batang": 400,
+  "pekalongan": 430,
+  "pemalang": 465,
+  "tegal": 495,
+  "brebes": 520,
+  "purwokerto": 460,
+  "banyumas": 460,
+  "purbalingga": 440,
+  "banjarnegara": 410,
+  "wonosobo": 370,
+  "kebumen": 410,
+  "purworejo": 370,
+  "cilacap": 490,
+
+  // Jawa Barat, DKI Jakarta, Banten
+  "jakarta": 780,
+  "jakarta pusat": 780,
+  "jakarta timur": 770,
+  "jakarta selatan": 780,
+  "jakarta barat": 785,
+  "jakarta utara": 780,
+  "bekasi": 760,
+  "depok": 780,
+  "bogor": 795,
+  "tangerang": 805,
+  "tangerang selatan": 800,
+  "serang": 860,
+  "cilegon": 880,
+  "bandung": 710,
+  "cimahi": 715,
+  "cirebon": 570,
+  "indramayu": 615,
+  "majalengka": 605,
+  "kuningan": 590,
+  "sumedang": 670,
+  "subang": 710,
+  "purwakarta": 730,
+  "karawang": 745,
+  "sukabumi": 830,
+  "cianjur": 765,
+  "tasikmalaya": 660,
+  "garut": 710,
+  "ciamis": 635,
+  "banjar": 605,
+
+  // Bali & Luar Jawa
+  "denpasar": 405,
+  "badung": 415,
+  "gianyar": 425,
+  "tabanan": 380,
+  "mataram": 560,
+  "lombok": 560,
+  "lampung": 980,
+  "bandar lampung": 980,
+  "palembang": 1250,
+  "jambi": 1500,
+  "padang": 1950,
+  "pekanbaru": 1980,
+  "medan": 2400,
+  "banda aceh": 2850
+};
+
+// Helper pencari jarak otomatis ke kota tujuan sesuai lokasi aplikasi (Surabaya)
+const getAutoDistanceForDestination = (cityName: string, destList: any[] = []): number | null => {
+  if (!cityName) return null;
+  const clean = cityName.trim().toLowerCase();
+
+  // 1. Cek dari master destination yang ada di database
+  const fromDb = destList.find((d: any) => d.city?.toLowerCase() === clean);
+  if (fromDb && fromDb.distance_km && Number(fromDb.distance_km) > 0) {
+    return Number(fromDb.distance_km);
+  }
+
+  // 2. Cek exact match dari tabel jarak kota
+  if (CITY_DISTANCES_FROM_BASE[clean]) {
+    return CITY_DISTANCES_FROM_BASE[clean];
+  }
+
+  // 3. Cek pembersihan kata awalan seperti "kota", "kabupaten", "kab."
+  const simplified = clean
+    .replace(/^(kota|kabupaten|kab\.)\s+/i, "")
+    .replace(/\s+\(.*\)$/, "")
+    .trim();
+
+  if (CITY_DISTANCES_FROM_BASE[simplified]) {
+    return CITY_DISTANCES_FROM_BASE[simplified];
+  }
+
+  // 4. Cek partial match
+  for (const [key, dist] of Object.entries(CITY_DISTANCES_FROM_BASE)) {
+    if (clean.includes(key) || key.includes(clean)) {
+      return dist;
+    }
+  }
+
+  return null;
+};
+
 export default function FuelMonitoringPage() {
   const router = useRouter();
 
@@ -452,6 +610,49 @@ export default function FuelMonitoringPage() {
   const [startKm, setStartKm] = useState<number | string>(12000);
   const [endKm, setEndKm] = useState<number | string>(12250);
   const [manualDistance, setManualDistance] = useState<number | string>(250);
+
+  // Otomatis hitung jarak sesuai lokasi aplikasi
+  const [isAutoDistance, setIsAutoDistance] = useState(false);
+  const [autoDistanceNote, setAutoDistanceNote] = useState("");
+  const [userHasCustomKm, setUserHasCustomKm] = useState(false);
+
+  // Otomatis hitung jarak ke kota tujuan jika KM belum di-input manual
+  useEffect(() => {
+    if (!destination) {
+      setIsAutoDistance(false);
+      return;
+    }
+    if (!userHasCustomKm || !manualDistance || manualDistance === 0) {
+      const autoDist = getAutoDistanceForDestination(destination, destinations);
+      if (autoDist && autoDist > 0) {
+        setManualDistance(autoDist);
+        const s = Number(startKm) || 12000;
+        setEndKm(s + autoDist);
+        setIsAutoDistance(true);
+        setAutoDistanceNote(`± ${autoDist} KM dari Kantor Surabaya (Lokasi Aplikasi)`);
+      }
+    }
+  }, [destination, destinations, userHasCustomKm, startKm]);
+
+  const handleRecalculateAutoDistance = (targetCity?: string) => {
+    const cityToLookup = targetCity || destination;
+    if (!cityToLookup) {
+      toast.error("Pilih atau ketik kota tujuan terlebih dahulu!");
+      return;
+    }
+    const autoDist = getAutoDistanceForDestination(cityToLookup, destinations);
+    if (autoDist && autoDist > 0) {
+      setManualDistance(autoDist);
+      const s = Number(startKm) || 12000;
+      setEndKm(s + autoDist);
+      setIsAutoDistance(true);
+      setUserHasCustomKm(false);
+      setAutoDistanceNote(`± ${autoDist} KM dari Kantor Surabaya (Lokasi Aplikasi)`);
+      toast.success(`Jarak ke ${cityToLookup} otomatis dihitung: ± ${autoDist} KM`);
+    } else {
+      toast.info(`Jarak standar ke "${cityToLookup}" belum terdaftar. Silakan masukkan KM secara manual.`);
+    }
+  };
 
   // Metode Konsumsi
   const [calculationMode, setCalculationMode] = useState<"estimate" | "actual_refill" | "tank_level">("estimate");
@@ -1212,6 +1413,7 @@ export default function FuelMonitoringPage() {
                     {filteredCities.length > 0 ? (
                       filteredCities.slice(0, 30).map((city) => {
                         const destObj = destinations.find((d: any) => d.city?.toLowerCase() === city.toLowerCase());
+                        const autoDist = getAutoDistanceForDestination(city, destinations);
                         return (
                           <button
                             key={city}
@@ -1219,19 +1421,22 @@ export default function FuelMonitoringPage() {
                             onClick={() => {
                               setDestination(city);
                               setCitySearch(city);
-                              if (destObj && destObj.distance_km) {
-                                setManualDistance(destObj.distance_km);
-                                const s = Number(startKm) || 12000;
-                                setEndKm(s + destObj.distance_km);
-                              }
                               setIsCityDropdownOpen(false);
+                              if (autoDist && autoDist > 0) {
+                                setManualDistance(autoDist);
+                                const s = Number(startKm) || 12000;
+                                setEndKm(s + autoDist);
+                                setIsAutoDistance(true);
+                                setUserHasCustomKm(false);
+                                setAutoDistanceNote(`± ${autoDist} KM dari Kantor Surabaya`);
+                              }
                             }}
                             className="w-full text-left px-3.5 py-2.5 text-sm text-surface-200 hover:bg-slate-800 hover:text-white flex items-center justify-between transition-colors"
                           >
                             <span className="font-medium text-white">{city}</span>
-                            {destObj?.distance_km && (
+                            {autoDist && autoDist > 0 && (
                               <span className="text-[10px] text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20 font-mono">
-                                ± {destObj.distance_km} KM
+                                ± {autoDist} KM
                               </span>
                             )}
                           </button>
@@ -1244,145 +1449,176 @@ export default function FuelMonitoringPage() {
                     )}
                   </div>
                 )}
+
+                {/* Status Jarak Otomatis Sesuai Lokasi Aplikasi */}
+                {destination && (
+                  <div className="flex items-center justify-between mt-1 text-[11px] px-0.5">
+                    {isAutoDistance ? (
+                      <span className="text-cyan-400 font-medium flex items-center gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 shrink-0 text-cyan-400" />
+                        Jarak otomatis: <strong className="text-white font-mono">{manualDistance} KM</strong> ({autoDistanceNote})
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 flex items-center gap-1">
+                        <MapPin className="w-3.5 h-3.5 text-slate-500" />
+                        Jarak perjalanan: <strong className="text-white font-mono">{effectiveDistance} KM</strong>
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleRecalculateAutoDistance(destination)}
+                      className="text-[11px] text-amber-400 hover:text-amber-300 hover:underline flex items-center gap-1 ml-auto cursor-pointer"
+                      title="Hitung otomatis jarak dari Kantor Surabaya PT TRANS KP"
+                    >
+                      <RotateCcw className="w-2.5 h-2.5" />
+                      Hitung Ulang Jarak
+                    </button>
+                  </div>
+                )}
               </div>
 
-              {/* 4. Waktu Keberangkatan (Format 24 Jam: 00.00 - 23.59 diketik manual) */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-brand-300 uppercase tracking-wider flex items-center justify-between">
-                  <span>Keberangkatan <span className="text-red-400">*</span></span>
-                  <span className="text-[10px] text-brand-400 font-mono font-bold">
-                    Pukul {departureHour}.{departureMinute} WIB
-                  </span>
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-400" />
-                    <input
-                      type="date"
-                      value={departureDate}
-                      onChange={(e) => setDepartureDate(e.target.value)}
-                      className="w-full pl-9 pr-2 py-2.5 bg-surface-900 border border-brand-500/40 text-white rounded-xl focus:outline-none focus:border-brand-500 text-sm"
-                    />
+              {/* 4. Menu Standar Konsumsi BBM per KM & Perhitungan Otomatis */}
+              <div className="sm:col-span-2 p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-slate-900/95 via-[#0c1427] to-slate-900/95 border border-slate-700/80 shadow-xl space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                      <Gauge className="w-5 h-5" />
+                    </span>
+                    <div>
+                      <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                        Standar Konsumsi BBM per KM (km/L)
+                        <span className="text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-semibold">
+                          Otomatis Dihitung
+                        </span>
+                      </h4>
+                      <p className="text-xs text-slate-400">
+                        Pilih kategori efisiensi armada operasional atau tentukan standar km per liter.
+                      </p>
+                    </div>
                   </div>
-                  <div className="relative">
-                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-400" />
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      placeholder="Ketik jam: 06.00"
-                      value={departureTimeText}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setDepartureTimeText(val);
-                        const parsed = parseTimeInput(val);
-                        setDepartureHour(parsed.hour);
-                        setDepartureMinute(parsed.minute);
-                      }}
-                      onBlur={() => {
-                        const parsed = parseTimeInput(departureTimeText);
-                        setDepartureTimeText(parsed.formatted);
-                        setDepartureHour(parsed.hour);
-                        setDepartureMinute(parsed.minute);
-                      }}
-                      className="w-full pl-9 pr-3 py-2.5 bg-surface-900 border border-brand-500/40 text-white rounded-xl focus:outline-none focus:border-brand-500 font-mono font-bold text-sm tracking-wider"
-                    />
-                  </div>
-                </div>
-                {/* Shortcut Jam Berangkat */}
-                <div className="flex items-center gap-1 text-[10px] text-surface-400 pt-0.5">
-                  <span className="shrink-0 text-[10px]">Cepat:</span>
-                  {["06.00", "07.00", "08.00", "13.00"].map((t) => {
-                    const [h, m] = t.split(".");
-                    return (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => {
-                          setDepartureTimeText(t);
-                          setDepartureHour(h);
-                          setDepartureMinute(m);
-                        }}
-                        className={cn(
-                          "px-1.5 py-0.5 rounded font-mono text-[10px] transition-colors cursor-pointer",
-                          departureHour === h && departureMinute === m
-                            ? "bg-brand-500/30 text-brand-300 font-bold border border-brand-500/40"
-                            : "bg-surface-800 hover:bg-surface-700 text-surface-300"
-                        )}
-                      >
-                        {t}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
 
-              {/* 5. Waktu Kembali / Selesai (Format 24 Jam diketik manual) */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-emerald-300 uppercase tracking-wider flex items-center justify-between">
-                  <span>Selesai / Kembali <span className="text-red-400">*</span></span>
-                  <span className="text-[10px] text-emerald-400 font-mono font-bold">
-                    Pukul {returnHour}.{returnMinute} WIB
-                  </span>
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400" />
-                    <input
-                      type="date"
-                      value={returnDate}
-                      onChange={(e) => setReturnDate(e.target.value)}
-                      className="w-full pl-9 pr-2 py-2.5 bg-surface-900 border border-emerald-500/40 text-white rounded-xl focus:outline-none focus:border-emerald-500 text-sm"
-                    />
-                  </div>
-                  <div className="relative">
-                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400" />
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      placeholder="Ketik jam: 18.00"
-                      value={returnTimeText}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setReturnTimeText(val);
-                        const parsed = parseTimeInput(val);
-                        setReturnHour(parsed.hour);
-                        setReturnMinute(parsed.minute);
-                      }}
-                      onBlur={() => {
-                        const parsed = parseTimeInput(returnTimeText);
-                        setReturnTimeText(parsed.formatted);
-                        setReturnHour(parsed.hour);
-                        setReturnMinute(parsed.minute);
-                      }}
-                      className="w-full pl-9 pr-3 py-2.5 bg-surface-900 border border-emerald-500/40 text-white rounded-xl focus:outline-none focus:border-emerald-500 font-mono font-bold text-sm tracking-wider"
-                    />
+                  {/* Ringkasan Cepat Konsumsi & Biaya per KM */}
+                  <div className="flex items-center gap-2">
+                    <div className="text-right px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800">
+                      <span className="text-[10px] text-slate-400 block">Konsumsi per KM</span>
+                      <span className="text-xs font-mono font-bold text-cyan-400">
+                        {(1 / (Number(standardKml) || 10)).toFixed(3)} L / KM
+                      </span>
+                    </div>
+                    <div className="text-right px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800">
+                      <span className="text-[10px] text-slate-400 block">Biaya per KM</span>
+                      <span className="text-xs font-mono font-bold text-amber-400">
+                        {formatRp(Math.round((fuelPrice || 10000) / (Number(standardKml) || 10)))} / KM
+                      </span>
+                    </div>
                   </div>
                 </div>
-                {/* Shortcut Jam Kembali */}
-                <div className="flex items-center gap-1 text-[10px] text-surface-400 pt-0.5">
-                  <span className="shrink-0 text-[10px]">Cepat:</span>
-                  {["15.00", "17.00", "18.00", "21.00"].map((t) => {
-                    const [h, m] = t.split(".");
-                    return (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => {
-                          setReturnTimeText(t);
-                          setReturnHour(h);
-                          setReturnMinute(m);
-                        }}
-                        className={cn(
-                          "px-1.5 py-0.5 rounded font-mono text-[10px] transition-colors cursor-pointer",
-                          returnHour === h && returnMinute === m
-                            ? "bg-emerald-500/30 text-emerald-300 font-bold border border-emerald-500/40"
-                            : "bg-surface-800 hover:bg-surface-700 text-surface-300"
-                        )}
-                      >
-                        {t}
-                      </button>
-                    );
-                  })}
+
+                {/* Pilihan Cepat Kategori Standar Armada (Dinamis dari vehicleStandards) */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-300">
+                      Pilihan Standar Konsumsi Armada:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReferenceTab("vehicle");
+                        setShowTariffReference(true);
+                      }}
+                      className="text-[11px] text-cyan-400 hover:text-cyan-300 hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <Pencil className="w-2.5 h-2.5" />
+                      Kelola Tabel Standar
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                    {vehicleStandards.map((vs) => {
+                      const nums = vs.standardKml.match(/\d+(\.\d+)?/g);
+                      let avgVal = 10;
+                      if (nums && nums.length >= 2) {
+                        avgVal = (Number(nums[0]) + Number(nums[1])) / 2;
+                      } else if (nums && nums.length === 1) {
+                        avgVal = Number(nums[0]);
+                      }
+
+                      const isSelected = Math.abs(Number(standardKml) - avgVal) < 0.3;
+
+                      return (
+                        <button
+                          key={vs.id}
+                          type="button"
+                          onClick={() => setStandardKml(avgVal)}
+                          className={cn(
+                            "p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between",
+                            isSelected
+                              ? "bg-cyan-500/20 text-white border-cyan-500/60 shadow-md ring-1 ring-cyan-500/30"
+                              : "bg-slate-950/60 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-slate-200"
+                          )}
+                        >
+                          <span className="text-xs font-bold truncate text-white block">
+                            {vs.vehicleType.split("/")[0].trim()}
+                          </span>
+                          <span className="text-[10px] text-slate-400 truncate block mt-0.5">
+                            {vs.standardKml}
+                          </span>
+                          <span className="text-[11px] font-mono font-bold text-cyan-300 mt-1.5 block">
+                            ± {avgVal} km/L
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Input Manual km/L & Live Perhitungan Otomatis */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                  <div className="sm:col-span-1">
+                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                      Ketik Manual Standar km/L
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="1"
+                        max="50"
+                        value={standardKml}
+                        onChange={(e) => setStandardKml(Number(e.target.value) || 1)}
+                        className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white font-mono font-bold text-sm focus:outline-none focus:border-cyan-500"
+                        placeholder="cth: 12"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-medium">
+                        km/Liter
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 block mt-1">
+                      1 Liter BBM menempuh {standardKml} KM ({(1 / (Number(standardKml) || 10)).toFixed(3)} L / KM)
+                    </span>
+                  </div>
+
+                  {/* Panel Hasil Perhitungan Otomatis Real-Time */}
+                  <div className="sm:col-span-2 grid grid-cols-3 gap-2 p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 items-center">
+                    <div className="p-2 rounded-lg bg-slate-900/90 text-center">
+                      <span className="text-[10px] text-slate-400 block">Jarak Rute</span>
+                      <span className="text-xs sm:text-sm font-mono font-bold text-white">
+                        {effectiveDistance} KM
+                      </span>
+                    </div>
+                    <div className="p-2 rounded-lg bg-slate-900/90 text-center">
+                      <span className="text-[10px] text-slate-400 block">Estimasi BBM</span>
+                      <span className="text-xs sm:text-sm font-mono font-bold text-cyan-400">
+                        ± {effectiveFuelUsed} L
+                      </span>
+                    </div>
+                    <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-center">
+                      <span className="text-[10px] text-amber-300 block">Estimasi Biaya</span>
+                      <span className="text-xs sm:text-sm font-mono font-bold text-amber-400">
+                        {formatRp(effectiveFuelCost)}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -1447,8 +1683,13 @@ export default function FuelMonitoringPage() {
               {/* 7. Input Jarak Tempuh / Odometer */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-semibold text-surface-300 uppercase tracking-wider">
-                    Jarak Tempuh (KM) <span className="text-red-400">*</span>
+                  <label className="text-xs font-semibold text-surface-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>Jarak Tempuh (KM) <span className="text-red-400">*</span></span>
+                    {isAutoDistance && (
+                      <span className="text-[10px] text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/20 font-mono font-normal">
+                        Otomatis Lokasi
+                      </span>
+                    )}
                   </label>
                   <div className="flex items-center gap-1 text-[10px]">
                     <button
@@ -1482,7 +1723,11 @@ export default function FuelMonitoringPage() {
                       <input
                         type="number"
                         value={startKm}
-                        onChange={(e) => setStartKm(e.target.value)}
+                        onChange={(e) => {
+                          setStartKm(e.target.value);
+                          setUserHasCustomKm(true);
+                          setIsAutoDistance(false);
+                        }}
                         placeholder="KM Awal"
                         className="w-full px-3 py-2 bg-surface-900 border border-surface-700 text-white rounded-xl text-xs font-mono font-bold"
                       />
@@ -1492,7 +1737,11 @@ export default function FuelMonitoringPage() {
                       <input
                         type="number"
                         value={endKm}
-                        onChange={(e) => setEndKm(e.target.value)}
+                        onChange={(e) => {
+                          setEndKm(e.target.value);
+                          setUserHasCustomKm(true);
+                          setIsAutoDistance(false);
+                        }}
                         placeholder="KM Akhir"
                         className="w-full px-3 py-2 bg-surface-900 border border-surface-700 text-white rounded-xl text-xs font-mono font-bold"
                       />
@@ -1503,15 +1752,30 @@ export default function FuelMonitoringPage() {
                     <input
                       type="number"
                       value={manualDistance}
-                      onChange={(e) => setManualDistance(e.target.value)}
+                      onChange={(e) => {
+                        setManualDistance(e.target.value);
+                        setUserHasCustomKm(true);
+                        setIsAutoDistance(false);
+                      }}
                       placeholder="Total Jarak dalam KM"
                       className="w-full px-3 py-2 bg-surface-900 border border-surface-700 text-white rounded-xl text-xs font-mono font-bold"
                     />
                   </div>
                 )}
-                <p className="text-[11px] text-cyan-400 font-mono font-medium">
-                  Total Jarak: <strong>{effectiveDistance} KM</strong>
-                </p>
+                <div className="flex items-center justify-between text-[11px] pt-0.5">
+                  <p className="text-cyan-400 font-mono font-medium">
+                    Total Jarak: <strong>{effectiveDistance} KM</strong>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleRecalculateAutoDistance()}
+                    className="text-[10px] text-amber-400 hover:text-amber-300 hover:underline flex items-center gap-1 cursor-pointer"
+                    title="Hitung otomatis jarak sesuai kota tujuan dari lokasi aplikasi"
+                  >
+                    <RotateCcw className="w-2.5 h-2.5" />
+                    Hitung Sesuai Lokasi Aplikasi
+                  </button>
+                </div>
               </div>
 
               {/* 8. Metode Konsumsi BBM */}
