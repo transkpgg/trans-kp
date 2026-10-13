@@ -2041,63 +2041,7 @@ export default function FuelMonitoringPage() {
                   </div>
                 </div>
 
-                {/* Pilihan Cepat Kategori Standar Armada (Dinamis dari vehicleStandards) */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-300">
-                      Pilihan Standar Konsumsi Armada:
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setReferenceTab("vehicle");
-                        setShowTariffReference(true);
-                      }}
-                      className="text-[11px] text-cyan-400 hover:text-cyan-300 hover:underline flex items-center gap-1 cursor-pointer"
-                    >
-                      <Pencil className="w-2.5 h-2.5" />
-                      Kelola Tabel Standar
-                    </button>
-                  </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                    {vehicleStandards.map((vs) => {
-                      const nums = vs.standardKml.match(/\d+(\.\d+)?/g);
-                      let avgVal = 10;
-                      if (nums && nums.length >= 2) {
-                        avgVal = (Number(nums[0]) + Number(nums[1])) / 2;
-                      } else if (nums && nums.length === 1) {
-                        avgVal = Number(nums[0]);
-                      }
-
-                      const isSelected = Math.abs(Number(standardKml) - avgVal) < 0.3;
-
-                      return (
-                        <button
-                          key={vs.id}
-                          type="button"
-                          onClick={() => setStandardKml(avgVal)}
-                          className={cn(
-                            "p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between",
-                            isSelected
-                              ? "bg-cyan-500/20 text-white border-cyan-500/60 shadow-md ring-1 ring-cyan-500/30"
-                              : "bg-slate-950/60 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-slate-200"
-                          )}
-                        >
-                          <span className="text-xs font-bold truncate text-white block">
-                            {vs.vehicleType.split("/")[0].trim()}
-                          </span>
-                          <span className="text-[10px] text-slate-400 truncate block mt-0.5">
-                            {vs.standardKml}
-                          </span>
-                          <span className="text-[11px] font-mono font-bold text-cyan-300 mt-1.5 block">
-                            ± {avgVal} km/L
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
 
                 {/* Input Manual km/L & Live Perhitungan Otomatis */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
