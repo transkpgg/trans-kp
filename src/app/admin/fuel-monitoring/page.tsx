@@ -42,7 +42,11 @@ import {
   Sparkles,
   RotateCcw,
   CalendarDays,
-  FileText
+  FileText,
+  Pencil,
+  Trash2,
+  Save,
+  Check
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatRp } from "@/lib/fuel-monitoring";
@@ -50,15 +54,42 @@ import { INDONESIA_CITIES } from "@/lib/indonesia-cities";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
-// Daftar Standar Bahan Bakar & Harga Resmi
-const FUEL_TYPES = [
-  { name: "Pertalite (RON 90)", price: 10000, color: "text-emerald-400" },
-  { name: "Pertamax (RON 92)", price: 12950, color: "text-blue-400" },
-  { name: "Pertamax Turbo (RON 98)", price: 14400, color: "text-red-400" },
-  { name: "Bio Solar Subsidi", price: 6800, color: "text-amber-400" },
-  { name: "Dexlite (CN 51)", price: 13900, color: "text-teal-400" },
-  { name: "Pertamina Dex (CN 53)", price: 14650, color: "text-purple-400" },
+// Tipe Data untuk Referensi BBM & Standar Armada
+interface FuelTariffItem {
+  id: string;
+  name: string;
+  category: string;
+  price: number;
+  color?: string;
+}
+
+interface VehicleStandardItem {
+  id: string;
+  vehicleType: string;
+  examples: string;
+  standardKml: string;
+}
+
+// Daftar Default Standar Bahan Bakar & Harga Resmi Pertamina
+const DEFAULT_FUEL_TARIFFS: FuelTariffItem[] = [
+  { id: "pertalite", name: "Pertalite (RON 90)", category: "BBM Standar Nasional", price: 10000, color: "text-emerald-400" },
+  { id: "pertamax", name: "Pertamax (RON 92)", category: "BBM Standar Nasional", price: 12950, color: "text-blue-400" },
+  { id: "pertamax-turbo", name: "Pertamax Turbo (RON 98)", category: "BBM Non-Subsidi", price: 14400, color: "text-red-400" },
+  { id: "bio-solar", name: "Bio Solar Subsidi", category: "BBM Subsidi Nasional", price: 6800, color: "text-amber-400" },
+  { id: "dexlite", name: "Dexlite (CN 51)", category: "BBM Non-Subsidi", price: 13900, color: "text-teal-400" },
+  { id: "pertamina-dex", name: "Pertamina Dex (CN 53)", category: "BBM Non-Subsidi", price: 14650, color: "text-purple-400" },
 ];
+
+// Daftar Default Standar Konsumsi Armada (km/L)
+const DEFAULT_VEHICLE_STANDARDS: VehicleStandardItem[] = [
+  { id: "mpv", vehicleType: "MPV / Kendaraan Ringan", examples: "Toyota Avanza, Veloz, Xenia, Ertiga", standardKml: "12 - 14 km/L" },
+  { id: "medium-mpv", vehicleType: "Medium MPV / Diesel", examples: "Toyota Innova Reborn Diesel / Zenix", standardKml: "10 - 12 km/L" },
+  { id: "commuter", vehicleType: "Van / Commuter", examples: "Toyota Hiace Commuter / Premio", standardKml: "9 - 10 km/L" },
+  { id: "minibus", vehicleType: "Minibus / Isuzu Elf", examples: "Isuzu Elf Long / Microbus", standardKml: "7 - 9 km/L" },
+  { id: "truk", vehicleType: "Truk / Kendaraan Berat", examples: "Colt Diesel / Truk Box", standardKml: "5 - 7 km/L" },
+];
+
+const FUEL_TYPES = DEFAULT_FUEL_TARIFFS;
 
 // Helper parse manual time input (06.00 / 08:00 / 1430 / 14)
 const parseTimeInput = (val: string): { hour: string; minute: string; formatted: string } => {
@@ -113,10 +144,207 @@ export default function FuelMonitoringPage() {
   const [verifyStatus, setVerifyStatus] = useState("sedang_diperiksa");
   const [verifyNotes, setVerifyNotes] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
-
   const [showTariffReference, setShowTariffReference] = useState(false);
 
-  // Print Fuel Slip Modal State
+  // Dynamic Fuel Tariffs & Vehicle Standards (Bisa Edit & Tambahkan)
+  const [fuelTariffs, setFuelTariffs] = useState<FuelTariffItem[]>(DEFAULT_FUEL_TARIFFS);
+  const [vehicleStandards, setVehicleStandards] = useState<VehicleStandardItem[]>(DEFAULT_VEHICLE_STANDARDS);
+
+  // Sub-tab tampilan modal referensi ("all" | "fuel" | "vehicle")
+  const [referenceTab, setReferenceTab] = useState<"all" | "fuel" | "vehicle">("all");
+
+  // State Edit & Tambah Fuel Tariff
+  const [editingFuelId, setEditingFuelId] = useState<string | null>(null);
+  const [editFuelForm, setEditFuelForm] = useState<{ name: string; category: string; price: number }>({ name: "", category: "", price: 0 });
+  const [isAddingFuel, setIsAddingFuel] = useState(false);
+  const [newFuelForm, setNewFuelForm] = useState<{ name: string; category: string; price: number }>({ name: "", category: "BBM Standar Nasional", price: 10000 });
+
+  // State Edit & Tambah Standar Kendaraan
+  const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null);
+  const [editVehicleForm, setEditVehicleForm] = useState<{ vehicleType: string; examples: string; standardKml: string }>({ vehicleType: "", examples: "", standardKml: "" });
+  const [isAddingVehicle, setIsAddingVehicle] = useState(false);
+  const [newVehicleForm, setNewVehicleForm] = useState<{ vehicleType: string; examples: string; standardKml: string }>({ vehicleType: "", examples: "", standardKml: "" });
+
+  // Load persistent tariffs from localStorage
+  useEffect(() => {
+    try {
+      const savedFuels = localStorage.getItem("transkp_fuel_tariffs");
+      if (savedFuels) {
+        const parsed = JSON.parse(savedFuels);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setFuelTariffs(parsed);
+        }
+      }
+      const savedVehicles = localStorage.getItem("transkp_vehicle_standards");
+      if (savedVehicles) {
+        const parsedV = JSON.parse(savedVehicles);
+        if (Array.isArray(parsedV) && parsedV.length > 0) {
+          setVehicleStandards(parsedV);
+        }
+      }
+    } catch (e) {
+      console.error("Failed loading local tariff references", e);
+    }
+  }, []);
+
+  const handleSaveFuelList = (updated: FuelTariffItem[]) => {
+    setFuelTariffs(updated);
+    try {
+      localStorage.setItem("transkp_fuel_tariffs", JSON.stringify(updated));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleSaveVehicleList = (updated: VehicleStandardItem[]) => {
+    setVehicleStandards(updated);
+    try {
+      localStorage.setItem("transkp_vehicle_standards", JSON.stringify(updated));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleAddFuel = () => {
+    if (!newFuelForm.name.trim()) {
+      toast.error("Nama jenis bahan bakar wajib diisi!");
+      return;
+    }
+    if (!newFuelForm.price || newFuelForm.price <= 0) {
+      toast.error("Harga BBM harus lebih besar dari Rp 0!");
+      return;
+    }
+    const newItem: FuelTariffItem = {
+      id: `fuel-${Date.now()}`,
+      name: newFuelForm.name.trim(),
+      category: newFuelForm.category.trim() || "BBM Standar Nasional",
+      price: Number(newFuelForm.price),
+      color: "text-amber-400",
+    };
+    const next = [...fuelTariffs, newItem];
+    handleSaveFuelList(next);
+    setIsAddingFuel(false);
+    setNewFuelForm({ name: "", category: "BBM Standar Nasional", price: 10000 });
+    toast.success(`Jenis BBM "${newItem.name}" berhasil ditambahkan!`);
+  };
+
+  const handleStartEditFuel = (f: FuelTariffItem) => {
+    setEditingFuelId(f.id);
+    setEditFuelForm({
+      name: f.name,
+      category: f.category,
+      price: f.price,
+    });
+  };
+
+  const handleSaveEditFuel = (id: string) => {
+    if (!editFuelForm.name.trim()) {
+      toast.error("Nama bahan bakar tidak boleh kosong!");
+      return;
+    }
+    const oldItem = fuelTariffs.find((f) => f.id === id);
+    const updatedPrice = Number(editFuelForm.price) || 0;
+    const next = fuelTariffs.map((f) =>
+      f.id === id
+        ? {
+            ...f,
+            name: editFuelForm.name.trim(),
+            category: editFuelForm.category.trim() || "BBM Standar Nasional",
+            price: updatedPrice > 0 ? updatedPrice : f.price,
+          }
+        : f
+    );
+    handleSaveFuelList(next);
+    if (oldItem && fuelType === oldItem.name) {
+      setFuelType(editFuelForm.name.trim());
+      if (updatedPrice > 0) setFuelPrice(updatedPrice);
+    }
+    setEditingFuelId(null);
+    toast.success("Perubahan tarif BBM berhasil disimpan!");
+  };
+
+  const handleDeleteFuel = (id: string, name: string) => {
+    if (fuelTariffs.length <= 1) {
+      toast.error("Minimal harus menyisakan 1 jenis BBM!");
+      return;
+    }
+    if (!confirm(`Hapus jenis BBM "${name}" dari tabel?`)) return;
+    const next = fuelTariffs.filter((f) => f.id !== id);
+    handleSaveFuelList(next);
+    toast.success(`Jenis BBM "${name}" telah dihapus.`);
+  };
+
+  const handleResetFuelTariffs = () => {
+    handleSaveFuelList(DEFAULT_FUEL_TARIFFS);
+    toast.info("Tarif BBM dikembalikan ke standar awal Pertamina.");
+  };
+
+  const handleAddVehicleStandard = () => {
+    if (!newVehicleForm.vehicleType.trim()) {
+      toast.error("Tipe kendaraan wajib diisi!");
+      return;
+    }
+    if (!newVehicleForm.standardKml.trim()) {
+      toast.error("Standar konsumsi (km/L) wajib diisi!");
+      return;
+    }
+    const newItem: VehicleStandardItem = {
+      id: `veh-${Date.now()}`,
+      vehicleType: newVehicleForm.vehicleType.trim(),
+      examples: newVehicleForm.examples.trim() || "-",
+      standardKml: newVehicleForm.standardKml.trim(),
+    };
+    const next = [...vehicleStandards, newItem];
+    handleSaveVehicleList(next);
+    setIsAddingVehicle(false);
+    setNewVehicleForm({ vehicleType: "", examples: "", standardKml: "" });
+    toast.success(`Standar kendaraan "${newItem.vehicleType}" berhasil ditambahkan!`);
+  };
+
+  const handleStartEditVehicle = (v: VehicleStandardItem) => {
+    setEditingVehicleId(v.id);
+    setEditVehicleForm({
+      vehicleType: v.vehicleType,
+      examples: v.examples,
+      standardKml: v.standardKml,
+    });
+  };
+
+  const handleSaveEditVehicle = (id: string) => {
+    if (!editVehicleForm.vehicleType.trim()) {
+      toast.error("Tipe kendaraan tidak boleh kosong!");
+      return;
+    }
+    const next = vehicleStandards.map((v) =>
+      v.id === id
+        ? {
+            ...v,
+            vehicleType: editVehicleForm.vehicleType.trim(),
+            examples: editVehicleForm.examples.trim() || "-",
+            standardKml: editVehicleForm.standardKml.trim() || v.standardKml,
+          }
+        : v
+    );
+    handleSaveVehicleList(next);
+    setEditingVehicleId(null);
+    toast.success("Standar konsumsi armada berhasil diperbarui!");
+  };
+
+  const handleDeleteVehicleStandard = (id: string, type: string) => {
+    if (vehicleStandards.length <= 1) {
+      toast.error("Minimal harus menyisakan 1 standar kendaraan!");
+      return;
+    }
+    if (!confirm(`Hapus tipe kendaraan "${type}" dari tabel?`)) return;
+    const next = vehicleStandards.filter((v) => v.id !== id);
+    handleSaveVehicleList(next);
+    toast.success(`Standar "${type}" telah dihapus.`);
+  };
+
+  const handleResetVehicleStandards = () => {
+    handleSaveVehicleList(DEFAULT_VEHICLE_STANDARDS);
+    toast.info("Standar konsumsi armada dikembalikan ke standar awal.");
+  };
   const [printFuelData, setPrintFuelData] = useState<{
     driverName: string;
     driverNik?: string;
@@ -1158,54 +1386,52 @@ export default function FuelMonitoringPage() {
                 </div>
               </div>
 
-              {/* 6. Pilihan Jenis BBM & Harga per Liter */}
+              {/* 6. Pilihan Jenis BBM & Harga per Liter (Dinamis dari fuelTariffs) */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-surface-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                  <span>Jenis BBM & Harga / Liter</span>
-                  <span className="text-[10px] font-mono text-amber-400 font-bold">{formatRp(fuelPrice)} / L</span>
-                </label>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {FUEL_TYPES.slice(0, 3).map((f) => (
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-surface-300 uppercase tracking-wider">
+                    Jenis BBM & Harga / Liter
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono text-amber-400 font-bold">{formatRp(fuelPrice)} / L</span>
                     <button
-                      key={f.name}
+                      type="button"
+                      onClick={() => {
+                        setReferenceTab("fuel");
+                        setShowTariffReference(true);
+                      }}
+                      className="text-[10px] text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer bg-amber-500/10 hover:bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/20 transition-colors"
+                      title="Buka tabel referensi untuk mengubah harga atau menambah jenis BBM"
+                    >
+                      <Pencil className="w-2.5 h-2.5" />
+                      Edit / Kelola Tarif
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                  {fuelTariffs.map((f) => (
+                    <button
+                      key={f.id}
                       type="button"
                       onClick={() => {
                         setFuelType(f.name);
                         setFuelPrice(f.price);
                       }}
                       className={cn(
-                        "py-1.5 px-2 rounded-lg text-[10px] font-semibold border transition-all truncate cursor-pointer",
+                        "py-2 px-2.5 rounded-xl text-left border transition-all cursor-pointer flex flex-col justify-between",
                         fuelType === f.name
-                          ? "bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm"
-                          : "bg-surface-900 text-surface-400 border-surface-700 hover:text-white"
+                          ? "bg-amber-500/20 text-amber-300 border-amber-500/60 shadow-md ring-1 ring-amber-500/30"
+                          : "bg-surface-900 text-surface-400 border-surface-700/80 hover:text-white hover:border-surface-600 hover:bg-surface-850"
                       )}
                       title={`${f.name} - ${formatRp(f.price)}`}
                     >
-                      {f.name.split(" ")[0]}
+                      <span className="font-semibold text-xs truncate w-full">{f.name}</span>
+                      <span className="font-mono text-[11px] font-bold text-amber-400 mt-1">{formatRp(f.price)}</span>
                     </button>
                   ))}
                 </div>
-                <div className="grid grid-cols-3 gap-1.5 pt-0.5">
-                  {FUEL_TYPES.slice(3, 6).map((f) => (
-                    <button
-                      key={f.name}
-                      type="button"
-                      onClick={() => {
-                        setFuelType(f.name);
-                        setFuelPrice(f.price);
-                      }}
-                      className={cn(
-                        "py-1.5 px-2 rounded-lg text-[10px] font-semibold border transition-all truncate cursor-pointer",
-                        fuelType === f.name
-                          ? "bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm"
-                          : "bg-surface-900 text-surface-400 border-surface-700 hover:text-white"
-                      )}
-                      title={`${f.name} - ${formatRp(f.price)}`}
-                    >
-                      {f.name.split(" ")[0]}
-                    </button>
-                  ))}
-                </div>
+
                 <div className="relative mt-1">
                   <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-surface-500" />
                   <input
@@ -2063,107 +2289,539 @@ export default function FuelMonitoringPage() {
       )}
 
       {/* ======================================================== */}
-      {/* MODAL: TABEL STANDAR KENDARAAN & TARIF BBM (MIRIP UPD)   */}
+      {/* MODAL: TABEL STANDAR KENDARAAN & TARIF BBM (BISA EDIT & TAMBAH) */}
       {/* ======================================================== */}
       {showTariffReference && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
-          <div className="glass-card w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 space-y-5 border border-surface-700 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-surface-800 pb-3">
-              <div className="flex items-center gap-2">
-                <span className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/85 backdrop-blur-md animate-fade-in p-3 sm:p-6 flex items-center justify-center">
+          <div className="bg-[#0f172a] border border-slate-700/80 w-full max-w-4xl rounded-2xl shadow-2xl shadow-black/90 flex flex-col max-h-[92vh] overflow-hidden my-auto">
+            {/* Header Modal - Sticky */}
+            <div className="shrink-0 px-5 sm:px-6 py-4 border-b border-slate-800 bg-slate-900/95 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
                   <Fuel className="w-5 h-5" />
                 </span>
                 <div>
-                  <h3 className="text-base font-bold text-white">Tabel Standar Kendaraan & Tarif Resmi BBM</h3>
-                  <p className="text-xs text-surface-400">Pedoman konsumsi bahan bakar armada dan standar efisiensi operasional.</p>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                      Tabel Standar Kendaraan & Tarif Resmi BBM
+                    </h3>
+                    <span className="text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-semibold">
+                      Bisa Edit & Tambah
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Pedoman harga resmi BBM Pertamina dan standar konsumsi armada operasional (km/L).
+                  </p>
                 </div>
               </div>
               <button
-                onClick={() => setShowTariffReference(false)}
-                className="p-1 rounded-lg text-surface-400 hover:text-white hover:bg-surface-800 transition-colors cursor-pointer"
+                type="button"
+                onClick={() => {
+                  setShowTariffReference(false);
+                  setIsAddingFuel(false);
+                  setIsAddingVehicle(false);
+                  setEditingFuelId(null);
+                  setEditingVehicleId(null);
+                }}
+                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Tutup Modal"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Tabel 1: Harga BBM Pertamina */}
-            <div className="space-y-2">
-              <h4 className="text-sm font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-amber-400" />
-                1. Daftar Harga Resmi Bahan Bakar Minyak
-              </h4>
-              <div className="overflow-x-auto rounded-xl border border-surface-800">
-                <table className="w-full text-xs text-left">
-                  <thead className="bg-[#0f172a] text-surface-300 font-semibold uppercase border-b border-surface-800">
-                    <tr>
-                      <th className="px-4 py-2.5">Jenis Bahan Bakar</th>
-                      <th className="px-4 py-2.5">Oktan / Cetane</th>
-                      <th className="px-4 py-2.5 text-right">Harga Resmi / Liter</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-surface-800 text-surface-200">
-                    {FUEL_TYPES.map((f) => (
-                      <tr key={f.name}>
-                        <td className="px-4 py-2 font-medium">{f.name}</td>
-                        <td className="px-4 py-2 text-surface-400">BBM Standar Nasional</td>
-                        <td className="px-4 py-2 text-right font-bold font-mono text-amber-400">{formatRp(f.price)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            {/* Sub-Header / Navigasi Tampilan Tab */}
+            <div className="shrink-0 px-5 sm:px-6 py-2.5 bg-[#0b1324] border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 p-1 bg-slate-900/90 rounded-xl border border-slate-800 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setReferenceTab("all")}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer",
+                    referenceTab === "all" ? "bg-amber-500 text-slate-950 font-bold shadow" : "text-slate-400 hover:text-white"
+                  )}
+                >
+                  Semua Tabel ({fuelTariffs.length + vehicleStandards.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReferenceTab("fuel")}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer flex items-center gap-1.5",
+                    referenceTab === "fuel" ? "bg-amber-500 text-slate-950 font-bold shadow" : "text-slate-400 hover:text-white"
+                  )}
+                >
+                  <Fuel className="w-3.5 h-3.5" />
+                  Tarif BBM ({fuelTariffs.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReferenceTab("vehicle")}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer flex items-center gap-1.5",
+                    referenceTab === "vehicle" ? "bg-cyan-500 text-slate-950 font-bold shadow" : "text-slate-400 hover:text-white"
+                  )}
+                >
+                  <Car className="w-3.5 h-3.5" />
+                  Standar Konsumsi ({vehicleStandards.length})
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm("Kembalikan seluruh daftar BBM dan standar konsumsi armada ke data awal?")) {
+                      handleResetFuelTariffs();
+                      handleResetVehicleStandards();
+                    }
+                  }}
+                  className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-amber-400 px-3 py-1.5 rounded-xl border border-slate-800 hover:border-amber-500/30 transition-all cursor-pointer bg-slate-900/50"
+                  title="Kembalikan tabel ke data default Pertamina dan pabrikan"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  Reset Default
+                </button>
               </div>
             </div>
 
-            {/* Tabel 2: Standar Konsumsi Armada */}
-            <div className="space-y-2">
-              <h4 className="text-sm font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-cyan-400" />
-                2. Standar Konsumsi BBM Kendaraan (km/L)
-              </h4>
-              <div className="overflow-x-auto rounded-xl border border-surface-800">
-                <table className="w-full text-xs text-left">
-                  <thead className="bg-[#0f172a] text-surface-300 font-semibold uppercase border-b border-surface-800">
-                    <tr>
-                      <th className="px-4 py-2.5">Tipe Kendaraan</th>
-                      <th className="px-4 py-2.5">Contoh Armada</th>
-                      <th className="px-4 py-2.5 text-right">Standar Konsumsi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-surface-800 text-surface-200">
-                    <tr>
-                      <td className="px-4 py-2 font-medium">MPV / Kendaraan Ringan</td>
-                      <td className="px-4 py-2 text-surface-400">Toyota Avanza, Veloz, Xenia</td>
-                      <td className="px-4 py-2 text-right font-bold text-emerald-400">12 - 14 km/L</td>
-                    </tr>
-                    <tr>
-                      <td className="px-4 py-2 font-medium">Medium MPV / Diesel</td>
-                      <td className="px-4 py-2 text-surface-400">Toyota Innova Reborn Diesel</td>
-                      <td className="px-4 py-2 text-right font-bold text-emerald-400">10 - 12 km/L</td>
-                    </tr>
-                    <tr>
-                      <td className="px-4 py-2 font-medium">Van / Commuter</td>
-                      <td className="px-4 py-2 text-surface-400">Toyota Hiace Commuter / Premio</td>
-                      <td className="px-4 py-2 text-right font-bold text-emerald-400">9 - 10 km/L</td>
-                    </tr>
-                    <tr>
-                      <td className="px-4 py-2 font-medium">Minibus / Isuzu Elf</td>
-                      <td className="px-4 py-2 text-surface-400">Isuzu Elf Long / Microbus</td>
-                      <td className="px-4 py-2 text-right font-bold text-emerald-400">7 - 9 km/L</td>
-                    </tr>
-                    <tr>
-                      <td className="px-4 py-2 font-medium">Truk / Kendaraan Berat</td>
-                      <td className="px-4 py-2 text-surface-400">Colt Diesel / Truk Box</td>
-                      <td className="px-4 py-2 text-right font-bold text-emerald-400">5 - 7 km/L</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+            {/* Scrollable Modal Content */}
+            <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-7 custom-scrollbar">
+              {/* ==================================================== */}
+              {/* TABEL 1: DAFTAR TARIF RESMI BAHAN BAKAR MINYAK (BBM) */}
+              {/* ==================================================== */}
+              {(referenceTab === "all" || referenceTab === "fuel") && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                      1. Daftar Tarif Resmi Bahan Bakar (BBM)
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 font-mono font-normal">
+                        {fuelTariffs.length} Jenis
+                      </span>
+                    </h4>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingFuel(!isAddingFuel)}
+                      className={cn(
+                        "flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl border transition-all cursor-pointer font-medium",
+                        isAddingFuel
+                          ? "bg-slate-800 text-slate-300 border-slate-700"
+                          : "bg-amber-500/15 text-amber-300 border-amber-500/30 hover:bg-amber-500/25"
+                      )}
+                    >
+                      {isAddingFuel ? (
+                        <>
+                          <X className="w-3.5 h-3.5" />
+                          Batal Tambah
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-3.5 h-3.5" />
+                          Tambah Jenis BBM
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Form Tambah BBM Baru */}
+                  {isAddingFuel && (
+                    <div className="p-4 rounded-xl bg-slate-900/90 border border-amber-500/30 space-y-3 animate-fade-in shadow-lg">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                        <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                          <Plus className="w-3.5 h-3.5" /> Form Tambah Jenis BBM Baru
+                        </span>
+                        <span className="text-[11px] text-slate-400">Isi data kemudian klik Simpan</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                            Nama BBM <span className="text-red-400">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="cth: Pertamax Green 95"
+                            value={newFuelForm.name}
+                            onChange={(e) => setNewFuelForm({ ...newFuelForm, name: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white text-xs focus:outline-none focus:border-amber-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                            Kategori / Oktan
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="cth: RON 95 / Bioetanol"
+                            value={newFuelForm.category}
+                            onChange={(e) => setNewFuelForm({ ...newFuelForm, category: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white text-xs focus:outline-none focus:border-amber-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                            Harga / Liter (Rp) <span className="text-red-400">*</span>
+                          </label>
+                          <input
+                            type="number"
+                            placeholder="cth: 13900"
+                            value={newFuelForm.price || ""}
+                            onChange={(e) => setNewFuelForm({ ...newFuelForm, price: Number(e.target.value) || 0 })}
+                            className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white text-xs font-mono font-bold focus:outline-none focus:border-amber-500"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setIsAddingFuel(false)}
+                          className="px-3 py-1.5 rounded-lg text-xs text-slate-400 hover:text-white bg-slate-800 transition-colors cursor-pointer"
+                        >
+                          Batal
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleAddFuel}
+                          className="px-4 py-1.5 rounded-lg text-xs font-semibold text-slate-950 bg-amber-400 hover:bg-amber-300 transition-all flex items-center gap-1.5 shadow cursor-pointer"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          Simpan Jenis BBM
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Tabel Data BBM */}
+                  <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950/40">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-[#0f172a] text-slate-300 font-semibold uppercase border-b border-slate-800">
+                        <tr>
+                          <th className="px-4 py-3">Jenis Bahan Bakar</th>
+                          <th className="px-4 py-3">Oktan / Kategori</th>
+                          <th className="px-4 py-3 text-right">Harga Resmi / Liter</th>
+                          <th className="px-4 py-3 text-center w-28">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/80 text-slate-200">
+                        {fuelTariffs.map((f) => {
+                          const isEditing = editingFuelId === f.id;
+                          return (
+                            <tr key={f.id} className="hover:bg-slate-800/30 transition-colors">
+                              {isEditing ? (
+                                <>
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="text"
+                                      value={editFuelForm.name}
+                                      onChange={(e) => setEditFuelForm({ ...editFuelForm, name: e.target.value })}
+                                      className="w-full px-2.5 py-1.5 bg-slate-900 border border-amber-500/50 rounded text-white text-xs focus:outline-none"
+                                    />
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="text"
+                                      value={editFuelForm.category}
+                                      onChange={(e) => setEditFuelForm({ ...editFuelForm, category: e.target.value })}
+                                      className="w-full px-2.5 py-1.5 bg-slate-900 border border-amber-500/50 rounded text-white text-xs focus:outline-none"
+                                    />
+                                  </td>
+                                  <td className="px-3 py-2 text-right">
+                                    <input
+                                      type="number"
+                                      value={editFuelForm.price}
+                                      onChange={(e) => setEditFuelForm({ ...editFuelForm, price: Number(e.target.value) || 0 })}
+                                      className="w-28 px-2.5 py-1.5 bg-slate-900 border border-amber-500/50 rounded text-amber-400 font-mono font-bold text-xs text-right focus:outline-none"
+                                    />
+                                  </td>
+                                  <td className="px-3 py-2 text-center">
+                                    <div className="flex items-center justify-center gap-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSaveEditFuel(f.id)}
+                                        className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors cursor-pointer"
+                                        title="Simpan Perubahan"
+                                      >
+                                        <Check className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingFuelId(null)}
+                                        className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                                        title="Batal"
+                                      >
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </>
+                              ) : (
+                                <>
+                                  <td className="px-4 py-2.5 font-medium text-white flex items-center gap-2">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                                    {f.name}
+                                  </td>
+                                  <td className="px-4 py-2.5 text-slate-400">{f.category || "BBM Standar Nasional"}</td>
+                                  <td className="px-4 py-2.5 text-right font-bold font-mono text-amber-400">
+                                    {formatRp(f.price)}
+                                  </td>
+                                  <td className="px-4 py-2.5 text-center">
+                                    <div className="flex items-center justify-center gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleStartEditFuel(f)}
+                                        className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition-colors cursor-pointer"
+                                        title="Edit Tarif"
+                                      >
+                                        <Pencil className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteFuel(f.id, f.name)}
+                                        className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                                        title="Hapus Jenis BBM"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </>
+                              )}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* ==================================================== */}
+              {/* TABEL 2: STANDAR KONSUMSI BBM KENDARAAN (KM/L)      */}
+              {/* ==================================================== */}
+              {(referenceTab === "all" || referenceTab === "vehicle") && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-cyan-400" />
+                      2. Standar Konsumsi BBM Kendaraan (km/L)
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 font-mono font-normal">
+                        {vehicleStandards.length} Kategori
+                      </span>
+                    </h4>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingVehicle(!isAddingVehicle)}
+                      className={cn(
+                        "flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl border transition-all cursor-pointer font-medium",
+                        isAddingVehicle
+                          ? "bg-slate-800 text-slate-300 border-slate-700"
+                          : "bg-cyan-500/15 text-cyan-300 border-cyan-500/30 hover:bg-cyan-500/25"
+                      )}
+                    >
+                      {isAddingVehicle ? (
+                        <>
+                          <X className="w-3.5 h-3.5" />
+                          Batal Tambah
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-3.5 h-3.5" />
+                          Tambah Tipe Kendaraan
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Form Tambah Standar Kendaraan Baru */}
+                  {isAddingVehicle && (
+                    <div className="p-4 rounded-xl bg-slate-900/90 border border-cyan-500/30 space-y-3 animate-fade-in shadow-lg">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                        <span className="text-xs font-bold text-cyan-400 flex items-center gap-1.5">
+                          <Plus className="w-3.5 h-3.5" /> Form Tambah Kategori Standar Armada
+                        </span>
+                        <span className="text-[11px] text-slate-400">Isi tipe dan estimasi standar km/L</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                            Tipe Kendaraan <span className="text-red-400">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="cth: SUV / 4x4"
+                            value={newVehicleForm.vehicleType}
+                            onChange={(e) => setNewVehicleForm({ ...newVehicleForm, vehicleType: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white text-xs focus:outline-none focus:border-cyan-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                            Contoh Armada
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="cth: Fortuner, Pajero Sport"
+                            value={newVehicleForm.examples}
+                            onChange={(e) => setNewVehicleForm({ ...newVehicleForm, examples: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white text-xs focus:outline-none focus:border-cyan-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                            Standar Konsumsi <span className="text-red-400">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="cth: 9 - 11 km/L"
+                            value={newVehicleForm.standardKml}
+                            onChange={(e) => setNewVehicleForm({ ...newVehicleForm, standardKml: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white text-xs font-semibold text-emerald-400 focus:outline-none focus:border-cyan-500"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setIsAddingVehicle(false)}
+                          className="px-3 py-1.5 rounded-lg text-xs text-slate-400 hover:text-white bg-slate-800 transition-colors cursor-pointer"
+                        >
+                          Batal
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleAddVehicleStandard}
+                          className="px-4 py-1.5 rounded-lg text-xs font-semibold text-slate-950 bg-cyan-400 hover:bg-cyan-300 transition-all flex items-center gap-1.5 shadow cursor-pointer"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          Simpan Standar Kendaraan
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Tabel Data Standar Konsumsi */}
+                  <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950/40">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-[#0f172a] text-slate-300 font-semibold uppercase border-b border-slate-800">
+                        <tr>
+                          <th className="px-4 py-3">Tipe Kendaraan</th>
+                          <th className="px-4 py-3">Contoh Armada</th>
+                          <th className="px-4 py-3 text-right">Standar Konsumsi</th>
+                          <th className="px-4 py-3 text-center w-28">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/80 text-slate-200">
+                        {vehicleStandards.map((v) => {
+                          const isEditing = editingVehicleId === v.id;
+                          return (
+                            <tr key={v.id} className="hover:bg-slate-800/30 transition-colors">
+                              {isEditing ? (
+                                <>
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="text"
+                                      value={editVehicleForm.vehicleType}
+                                      onChange={(e) => setEditVehicleForm({ ...editVehicleForm, vehicleType: e.target.value })}
+                                      className="w-full px-2.5 py-1.5 bg-slate-900 border border-cyan-500/50 rounded text-white text-xs focus:outline-none"
+                                    />
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="text"
+                                      value={editVehicleForm.examples}
+                                      onChange={(e) => setEditVehicleForm({ ...editVehicleForm, examples: e.target.value })}
+                                      className="w-full px-2.5 py-1.5 bg-slate-900 border border-cyan-500/50 rounded text-white text-xs focus:outline-none"
+                                    />
+                                  </td>
+                                  <td className="px-3 py-2 text-right">
+                                    <input
+                                      type="text"
+                                      value={editVehicleForm.standardKml}
+                                      onChange={(e) => setEditVehicleForm({ ...editVehicleForm, standardKml: e.target.value })}
+                                      className="w-28 px-2.5 py-1.5 bg-slate-900 border border-cyan-500/50 rounded text-emerald-400 font-semibold text-xs text-right focus:outline-none"
+                                    />
+                                  </td>
+                                  <td className="px-3 py-2 text-center">
+                                    <div className="flex items-center justify-center gap-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSaveEditVehicle(v.id)}
+                                        className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors cursor-pointer"
+                                        title="Simpan Perubahan"
+                                      >
+                                        <Check className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingVehicleId(null)}
+                                        className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                                        title="Batal"
+                                      >
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </>
+                              ) : (
+                                <>
+                                  <td className="px-4 py-2.5 font-medium text-white flex items-center gap-2">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                                    {v.vehicleType}
+                                  </td>
+                                  <td className="px-4 py-2.5 text-slate-400">{v.examples}</td>
+                                  <td className="px-4 py-2.5 text-right font-bold text-emerald-400">
+                                    {v.standardKml}
+                                  </td>
+                                  <td className="px-4 py-2.5 text-center">
+                                    <div className="flex items-center justify-center gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleStartEditVehicle(v)}
+                                        className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-400 hover:bg-slate-800 transition-colors cursor-pointer"
+                                        title="Edit Standar"
+                                      >
+                                        <Pencil className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteVehicleStandard(v.id, v.vehicleType)}
+                                        className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                                        title="Hapus Standar"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </>
+                              )}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="flex justify-end pt-2">
+            {/* Footer Modal - Sticky */}
+            <div className="shrink-0 px-5 sm:px-6 py-3.5 border-t border-slate-800 bg-slate-900/95 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
+              <span className="flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span>Perubahan disimpan otomatis di browser & langsung terintegrasi dengan Kalkulator BBM.</span>
+              </span>
               <button
-                onClick={() => setShowTariffReference(false)}
-                className="px-4 py-2 rounded-xl bg-surface-800 hover:bg-surface-700 text-surface-200 text-xs font-semibold cursor-pointer"
+                type="button"
+                onClick={() => {
+                  setShowTariffReference(false);
+                  setIsAddingFuel(false);
+                  setIsAddingVehicle(false);
+                  setEditingFuelId(null);
+                  setEditingVehicleId(null);
+                }}
+                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold transition-colors cursor-pointer ml-auto"
               >
                 Tutup
               </button>
