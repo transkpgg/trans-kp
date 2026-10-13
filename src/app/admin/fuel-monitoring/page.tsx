@@ -121,9 +121,254 @@ const parseTimeInput = (val: string): { hour: string; minute: string; formatted:
   return { hour: hourStr, minute: minStr, formatted: `${hourStr}.${minStr}` };
 };
 
-// Jarak rata-rata jalan raya (KM) dari Lokasi Aplikasi (Kantor Pusat Surabaya PT TRANS KP) ke kota-kota di Indonesia
-const CITY_DISTANCES_FROM_BASE: Record<string, number> = {
-  // Wilayah Surabaya & Sekitarnya
+// Jarak Jalan Raya (KM) dari KEDIRI, Jawa Timur (Lokasi Pengguna / Aplikasi) ke Berbagai Kota & Kecamatan
+const DISTANCES_FROM_KEDIRI: Record<string, number> = {
+  // Wilayah Kediri & Sekitar (Dalam Kota / Kecamatan / Hub Transportasi)
+  "kediri": 10,
+  "kota kediri": 10,
+  "kabupaten kediri": 15,
+  "slg": 6,
+  "simpang lima gumul": 6,
+  "bandara dhoho": 15,
+  "bandara dhoho kediri": 15,
+  "bandar udara dhoho": 15,
+  "dhoho": 15,
+  "stasiun kediri": 3,
+  "terminal tamanan": 5,
+  "pare": 25,
+  "kertosono": 28,
+  "papar": 16,
+  "gampengrejo": 8,
+  "ngadiluwih": 12,
+  "kras": 18,
+  "gurah": 10,
+  "plosoklaten": 16,
+  "wates": 20,
+  "kandangan": 28,
+  "badas": 26,
+  "plemahan": 20,
+  "purwoasri": 22,
+  "tarokan": 15,
+  "grogol": 12,
+  "banyakan": 10,
+  "mojo": 16,
+  "semen": 8,
+  "ringinrejo": 22,
+  "ngancar": 28,
+  "kelud": 35,
+  "gunung kelud": 35,
+
+  // Jawa Timur Sekitar (Nganjuk, Tulungagung, Blitar, Jombang, Trenggalek)
+  "nganjuk": 32,
+  "kota nganjuk": 32,
+  "kabupaten nganjuk": 32,
+  "baron": 25,
+  "warujayeng": 24,
+  "tulungagung": 32,
+  "kota tulungagung": 32,
+  "kabupaten tulungagung": 32,
+  "ngunut": 30,
+  "campurdarat": 42,
+  "blitar": 42,
+  "kota blitar": 42,
+  "kabupaten blitar": 45,
+  "srengat": 32,
+  "wlingi": 60,
+  "lodoyo": 50,
+  "kanigoro": 48,
+  "trenggalek": 52,
+  "kota trenggalek": 52,
+  "kabupaten trenggalek": 52,
+  "durenan": 40,
+  "watulimo": 75,
+  "prigi": 80,
+  "jombang": 45,
+  "kota jombang": 45,
+  "kabupaten jombang": 45,
+  "ploso": 55,
+
+  // Madiun Raya & Jawa Timur Barat
+  "madiun": 76,
+  "kota madiun": 76,
+  "kabupaten madiun": 80,
+  "caruban": 65,
+  "dolopo": 60,
+  "ponorogo": 72,
+  "kota ponorogo": 72,
+  "kabupaten ponorogo": 72,
+  "ngawi": 92,
+  "kabupaten ngawi": 92,
+  "magetan": 95,
+  "kabupaten magetan": 95,
+  "maospati": 82,
+  "sarangan": 115,
+  "pacitan": 155,
+  "kabupaten pacitan": 155,
+
+  // Gerbangkertosusila & Pantai Utara Jawa Timur
+  "mojokerto": 75,
+  "kota mojokerto": 75,
+  "kabupaten mojokerto": 78,
+  "krian": 92,
+  "sidoarjo": 105,
+  "kabupaten sidoarjo": 105,
+  "porong": 98,
+  "waru": 110,
+  "juanda": 115,
+  "bandara juanda": 115,
+  "bandara juanda surabaya": 115,
+  "surabaya": 120,
+  "kota surabaya": 120,
+  "tanjung perak": 125,
+  "pelabuhan tanjung perak": 125,
+  "gresik": 115,
+  "kabupaten gresik": 115,
+  "lamongan": 92,
+  "kabupaten lamongan": 92,
+  "babat": 78,
+  "bojonegoro": 95,
+  "kabupaten bojonegoro": 95,
+  "tuban": 118,
+  "kabupaten tuban": 118,
+
+  // Malang Raya & Jawa Timur Timur
+  "batu": 82,
+  "kota batu": 82,
+  "pujon": 68,
+  "ngantang": 52,
+  "kasembon": 42,
+  "malang": 88,
+  "kota malang": 88,
+  "kabupaten malang": 92,
+  "kepanjen": 85,
+  "singosari": 95,
+  "lawang": 100,
+  "pasuruan": 125,
+  "kota pasuruan": 125,
+  "kabupaten pasuruan": 125,
+  "bangil": 115,
+  "gempol": 102,
+  "pandaan": 110,
+  "probolinggo": 165,
+  "kota probolinggo": 165,
+  "kabupaten probolinggo": 165,
+  "kraksaan": 190,
+  "bromo": 135,
+  "lumajang": 160,
+  "kabupaten lumajang": 160,
+  "jember": 210,
+  "kabupaten jember": 210,
+  "bondowoso": 230,
+  "kabupaten bondowoso": 230,
+  "situbondo": 245,
+  "kabupaten situbondo": 245,
+  "banyuwangi": 350,
+  "kabupaten banyuwangi": 350,
+  "ketapang": 355,
+  "pelabuhan ketapang": 355,
+
+  // Madura dari Kediri
+  "bangkalan": 145,
+  "sampang": 195,
+  "pamekasan": 225,
+  "sumenep": 275,
+
+  // Jawa Tengah & DIY dari Kediri
+  "cepu": 115,
+  "blora": 145,
+  "sragen": 165,
+  "solo": 175,
+  "surakarta": 175,
+  "surakarta (solo)": 175,
+  "karanganyar": 185,
+  "sukoharjo": 185,
+  "boyolali": 195,
+  "klaten": 205,
+  "wonogiri": 215,
+  "salatiga": 220,
+  "rembang": 190,
+  "pati": 240,
+  "kudus": 250,
+  "jepara": 265,
+  "demak": 260,
+  "semarang": 265,
+  "kota semarang": 265,
+  "kendal": 290,
+  "batang": 320,
+  "pekalongan": 350,
+  "pemalang": 385,
+  "tegal": 415,
+  "brebes": 440,
+  "magelang": 255,
+  "temanggung": 280,
+  "wonosobo": 295,
+  "purworejo": 285,
+  "kebumen": 325,
+  "purwokerto": 380,
+  "banyumas": 380,
+  "purbalingga": 365,
+  "banjarnegara": 335,
+  "cilacap": 415,
+  "yogyakarta": 235,
+  "jogja": 235,
+  "sleman": 230,
+  "bantul": 240,
+  "gunungkidul": 230,
+  "kulon progo": 255,
+
+  // Jawa Barat, DKI Jakarta, Banten dari Kediri
+  "cirebon": 490,
+  "kuningan": 510,
+  "majalengka": 525,
+  "indramayu": 535,
+  "sumedang": 590,
+  "bandung": 620,
+  "cimahi": 625,
+  "tasikmalaya": 570,
+  "ciamis": 545,
+  "banjar": 515,
+  "garut": 620,
+  "subang": 630,
+  "purwakarta": 650,
+  "karawang": 665,
+  "bekasi": 690,
+  "jakarta": 710,
+  "dki jakarta": 710,
+  "jakarta pusat": 710,
+  "jakarta timur": 700,
+  "jakarta selatan": 710,
+  "jakarta barat": 715,
+  "jakarta utara": 710,
+  "depok": 715,
+  "bogor": 730,
+  "tangerang": 735,
+  "tangerang selatan": 730,
+  "serang": 790,
+  "cilegon": 810,
+  "sukabumi": 760,
+  "cianjur": 695,
+
+  // Bali & Luar Jawa dari Kediri
+  "gilimanuk": 360,
+  "denpasar": 465,
+  "badung": 475,
+  "gianyar": 485,
+  "tabanan": 440,
+  "singaraja": 420,
+  "mataram": 620,
+  "lombok": 620,
+  "lampung": 910,
+  "bandar lampung": 910,
+  "palembang": 1180,
+  "jambi": 1430,
+  "padang": 1880,
+  "pekanbaru": 1910,
+  "medan": 2330,
+  "banda aceh": 2780
+};
+
+// Jarak Jalan Raya (KM) dari Surabaya ke Berbagai Kota (Alternatif Origin)
+const DISTANCES_FROM_SURABAYA: Record<string, number> = {
   "surabaya": 15,
   "sidoarjo": 28,
   "gresik": 32,
@@ -131,8 +376,6 @@ const CITY_DISTANCES_FROM_BASE: Record<string, number> = {
   "pasuruan": 65,
   "lamongan": 48,
   "bangkalan": 35,
-
-  // Jawa Timur Lainnya
   "malang": 92,
   "batu": 105,
   "probolinggo": 105,
@@ -142,138 +385,204 @@ const CITY_DISTANCES_FROM_BASE: Record<string, number> = {
   "situbondo": 188,
   "banyuwangi": 290,
   "jombang": 78,
-  "kediri": 122,
+  "kediri": 120,
   "blitar": 155,
   "tulungagung": 150,
   "trenggalek": 180,
   "nganjuk": 110,
   "madiun": 165,
-  "magetan": 185,
-  "ngawi": 180,
-  "bojonegoro": 108,
-  "tuban": 102,
-  "pacitan": 270,
-  "sampang": 85,
-  "pamekasan": 115,
-  "sumenep": 165,
-
-  // Jawa Tengah & DIY
   "solo": 255,
-  "surakarta": 255,
-  "surakarta (solo)": 255,
   "semarang": 345,
-  "salatiga": 300,
-  "magelang": 335,
   "yogyakarta": 325,
-  "jogja": 325,
-  "sleman": 320,
-  "bantul": 330,
-  "klaten": 285,
-  "boyolali": 270,
-  "sragen": 230,
-  "karanganyar": 265,
-  "wonogiri": 290,
-  "sukoharjo": 265,
-  "kudus": 290,
-  "pati": 265,
-  "rembang": 205,
-  "blora": 160,
-  "cepu": 135,
-  "demak": 320,
-  "kendal": 370,
-  "batang": 400,
-  "pekalongan": 430,
-  "pemalang": 465,
-  "tegal": 495,
-  "brebes": 520,
-  "purwokerto": 460,
-  "banyumas": 460,
-  "purbalingga": 440,
-  "banjarnegara": 410,
-  "wonosobo": 370,
-  "kebumen": 410,
-  "purworejo": 370,
-  "cilacap": 490,
-
-  // Jawa Barat, DKI Jakarta, Banten
-  "jakarta": 780,
-  "jakarta pusat": 780,
-  "jakarta timur": 770,
-  "jakarta selatan": 780,
-  "jakarta barat": 785,
-  "jakarta utara": 780,
-  "bekasi": 760,
-  "depok": 780,
-  "bogor": 795,
-  "tangerang": 805,
-  "tangerang selatan": 800,
-  "serang": 860,
-  "cilegon": 880,
   "bandung": 710,
-  "cimahi": 715,
-  "cirebon": 570,
-  "indramayu": 615,
-  "majalengka": 605,
-  "kuningan": 590,
-  "sumedang": 670,
-  "subang": 710,
-  "purwakarta": 730,
-  "karawang": 745,
-  "sukabumi": 830,
-  "cianjur": 765,
-  "tasikmalaya": 660,
-  "garut": 710,
-  "ciamis": 635,
-  "banjar": 605,
-
-  // Bali & Luar Jawa
-  "denpasar": 405,
-  "badung": 415,
-  "gianyar": 425,
-  "tabanan": 380,
-  "mataram": 560,
-  "lombok": 560,
-  "lampung": 980,
-  "bandar lampung": 980,
-  "palembang": 1250,
-  "jambi": 1500,
-  "padang": 1950,
-  "pekanbaru": 1980,
-  "medan": 2400,
-  "banda aceh": 2850
+  "jakarta": 780,
+  "denpasar": 405
 };
 
-// Helper pencari jarak otomatis ke kota tujuan sesuai lokasi aplikasi (Surabaya)
-const getAutoDistanceForDestination = (cityName: string, destList: any[] = []): number | null => {
-  if (!cityName) return null;
-  const clean = cityName.trim().toLowerCase();
+// Koordinat Kota-Kota di Indonesia untuk Kalkulasi Jarak Universal (Haversine)
+const CITY_COORDINATES: Record<string, { lat: number; lng: number }> = {
+  "kediri": { lat: -7.8166, lng: 112.0118 },
+  "surabaya": { lat: -7.2575, lng: 112.7521 },
+  "sidoarjo": { lat: -7.4478, lng: 112.7183 },
+  "malang": { lat: -7.9666, lng: 112.6326 },
+  "batu": { lat: -7.8712, lng: 112.5273 },
+  "nganjuk": { lat: -7.6053, lng: 111.9038 },
+  "jombang": { lat: -7.5468, lng: 112.2331 },
+  "tulungagung": { lat: -8.0664, lng: 111.9027 },
+  "blitar": { lat: -8.0983, lng: 112.1681 },
+  "trenggalek": { lat: -8.0504, lng: 111.7147 },
+  "madiun": { lat: -7.6298, lng: 111.5239 },
+  "ponorogo": { lat: -7.8671, lng: 111.4657 },
+  "ngawi": { lat: -7.4039, lng: 111.4447 },
+  "magetan": { lat: -7.6521, lng: 111.3283 },
+  "bojonegoro": { lat: -7.1502, lng: 111.8817 },
+  "tuban": { lat: -6.8976, lng: 112.0649 },
+  "lamongan": { lat: -7.1283, lng: 112.4131 },
+  "gresik": { lat: -7.1566, lng: 112.6555 },
+  "mojokerto": { lat: -7.4726, lng: 112.4381 },
+  "pasuruan": { lat: -7.6453, lng: 112.9075 },
+  "probolinggo": { lat: -7.7543, lng: 113.2159 },
+  "lumajang": { lat: -8.1331, lng: 113.2246 },
+  "jember": { lat: -8.1724, lng: 113.7007 },
+  "bondowoso": { lat: -7.9135, lng: 113.8214 },
+  "situbondo": { lat: -7.7061, lng: 114.0048 },
+  "banyuwangi": { lat: -8.2192, lng: 114.3692 },
+  "pacitan": { lat: -8.2065, lng: 111.0921 },
+  "solo": { lat: -7.5755, lng: 110.8243 },
+  "surakarta": { lat: -7.5755, lng: 110.8243 },
+  "semarang": { lat: -6.9667, lng: 110.4167 },
+  "yogyakarta": { lat: -7.7956, lng: 110.3695 },
+  "bandung": { lat: -6.9175, lng: 107.6191 },
+  "jakarta": { lat: -6.2088, lng: 106.8456 },
+  "denpasar": { lat: -8.6705, lng: 115.2126 }
+};
 
-  // 1. Cek dari master destination yang ada di database
-  const fromDb = destList.find((d: any) => d.city?.toLowerCase() === clean);
-  if (fromDb && fromDb.distance_km && Number(fromDb.distance_km) > 0) {
-    return Number(fromDb.distance_km);
+// Helper parse rute teks (misal: "Kediri - Surabaya PP", "Kediri ke Malang", "Surabaya PP")
+const parseRouteString = (
+  raw: string,
+  origin: string = "Kediri"
+): { cleanDestination: string; isRoundTrip: boolean } => {
+  if (!raw) return { cleanDestination: "", isRoundTrip: false };
+  let str = raw.trim();
+
+  // 1. Deteksi kata PP / Pulang Pergi / Bolak Balik
+  const isRoundTrip = /\b(pp|p\.p|pergi\s*pulang|pulang\s*pergi|bolak\s*balik|round\s*trip)\b/i.test(str);
+  str = str.replace(/\b(pp|p\.p|pergi\s*pulang|pulang\s*pergi|bolak\s*balik|round\s*trip)\b/gi, " ");
+
+  // 2. Format rute: "Kediri - Surabaya", "Kediri ke Surabaya", "Kediri -> Surabaya"
+  const separators = [" - ", " ke ", " menuju ", " -> ", " ➔ ", " --> "];
+  let matchedSep = false;
+  for (const sep of separators) {
+    if (str.toLowerCase().includes(sep)) {
+      const parts = str.split(new RegExp(sep, "i"));
+      if (parts.length >= 2) {
+        str = parts[parts.length - 1].trim();
+        matchedSep = true;
+        break;
+      }
+    }
   }
 
-  // 2. Cek exact match dari tabel jarak kota
-  if (CITY_DISTANCES_FROM_BASE[clean]) {
-    return CITY_DISTANCES_FROM_BASE[clean];
+  // Jika dipisah tanda minus sederhana "kediri-surabaya" tanpa spasi
+  if (!matchedSep && str.includes("-")) {
+    const parts = str.split("-");
+    if (parts.length >= 2) {
+      str = parts[parts.length - 1].trim();
+    }
   }
 
-  // 3. Cek pembersihan kata awalan seperti "kota", "kabupaten", "kab."
-  const simplified = clean
+  // 3. Bersihkan prefix dan suffix umum
+  str = str
+    .replace(/^dari\s+[a-z\s]+(ke|menuju)\s+/i, "")
+    .replace(/^(ke|menuju)\s+/i, "")
+    .replace(/^(kota|kabupaten|kab\.|kecamatan|kec\.|wilayah|kantor|cabang|area|rsud)\s+/i, "")
+    .replace(/,\s*(jawa\s*timur|jatim|jawa\s*tengah|jateng|jawa\s*barat|jabar|diy|dki\s*jakarta|dki|bali).*$/i, "")
+    .replace(/\s*\([^)]*\)/g, "")
+    .trim();
+
+  return { cleanDestination: str, isRoundTrip };
+};
+
+// Helper pencari jarak otomatis antar kota (Default asal: Kediri, Jawa Timur)
+const getAutoDistanceForDestination = (
+  targetCity: string,
+  originCity: string = "Kediri",
+  destList: any[] = [],
+  tripMultiplier: number = 1
+): number | null => {
+  if (!targetCity) return null;
+
+  const parsed = parseRouteString(targetCity, originCity);
+  const cleanTarget = (parsed.cleanDestination || targetCity).trim().toLowerCase();
+  const effectiveMultiplier = (parsed.isRoundTrip ? 2 : 1) * tripMultiplier;
+
+  const cleanOrigin = (originCity || "kediri")
+    .trim()
+    .toLowerCase()
     .replace(/^(kota|kabupaten|kab\.)\s+/i, "")
     .replace(/\s+\(.*\)$/, "")
     .trim();
 
-  if (CITY_DISTANCES_FROM_BASE[simplified]) {
-    return CITY_DISTANCES_FROM_BASE[simplified];
+  let oneWayDistance: number | null = null;
+
+  // 1. Jika Origin adalah Kediri (Lokasi Pengguna)
+  if (cleanOrigin.includes("kediri") || !cleanOrigin) {
+    if (DISTANCES_FROM_KEDIRI[cleanTarget] !== undefined) {
+      oneWayDistance = DISTANCES_FROM_KEDIRI[cleanTarget];
+    } else {
+      // Prioritaskan kecocokan key terpanjang terlebih dahulu agar tidak salah cocok
+      const sortedKeys = Object.keys(DISTANCES_FROM_KEDIRI).sort((a, b) => b.length - a.length);
+      for (const key of sortedKeys) {
+        if (cleanTarget === key) {
+          oneWayDistance = DISTANCES_FROM_KEDIRI[key];
+          break;
+        }
+      }
+      if (oneWayDistance === null) {
+        for (const key of sortedKeys) {
+          if (cleanTarget.includes(key) || (key.length >= 4 && key.includes(cleanTarget))) {
+            oneWayDistance = DISTANCES_FROM_KEDIRI[key];
+            break;
+          }
+        }
+      }
+    }
   }
 
-  // 4. Cek partial match
-  for (const [key, dist] of Object.entries(CITY_DISTANCES_FROM_BASE)) {
-    if (clean.includes(key) || key.includes(clean)) {
-      return dist;
+  // 2. Jika Origin adalah Surabaya
+  if (oneWayDistance === null && cleanOrigin.includes("surabaya")) {
+    if (DISTANCES_FROM_SURABAYA[cleanTarget] !== undefined) {
+      oneWayDistance = DISTANCES_FROM_SURABAYA[cleanTarget];
+    } else {
+      const sortedKeys = Object.keys(DISTANCES_FROM_SURABAYA).sort((a, b) => b.length - a.length);
+      for (const key of sortedKeys) {
+        if (cleanTarget.includes(key) || (key.length >= 4 && key.includes(cleanTarget))) {
+          oneWayDistance = DISTANCES_FROM_SURABAYA[key];
+          break;
+        }
+      }
     }
+  }
+
+  // 3. Cek dari master destination database
+  if (oneWayDistance === null && destList && destList.length > 0) {
+    const fromDb = destList.find((d: any) => d.city?.toLowerCase().includes(cleanTarget));
+    if (fromDb && fromDb.distance_km && Number(fromDb.distance_km) > 0) {
+      oneWayDistance = Number(fromDb.distance_km);
+    }
+  }
+
+  // 4. Fallback kalkulasi via Koordinat GPS (Haversine formula * faktor jalan darat 1.32)
+  if (oneWayDistance === null) {
+    const origCoord = CITY_COORDINATES[cleanOrigin] || CITY_COORDINATES["kediri"];
+    let targetCoord = CITY_COORDINATES[cleanTarget];
+    if (!targetCoord) {
+      for (const [key, coord] of Object.entries(CITY_COORDINATES)) {
+        if (cleanTarget.includes(key) || key.includes(cleanTarget)) {
+          targetCoord = coord;
+          break;
+        }
+      }
+    }
+
+    if (origCoord && targetCoord) {
+      const R = 6371; // radius bumi km
+      const dLat = ((targetCoord.lat - origCoord.lat) * Math.PI) / 180;
+      const dLng = ((targetCoord.lng - origCoord.lng) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos((origCoord.lat * Math.PI) / 180) *
+          Math.cos((targetCoord.lat * Math.PI) / 180) *
+          Math.sin(dLng / 2) *
+          Math.sin(dLng / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const airDistance = R * c;
+      oneWayDistance = Math.max(10, Math.round(airDistance * 1.32));
+    }
+  }
+
+  if (oneWayDistance !== null) {
+    return oneWayDistance * effectiveMultiplier;
   }
 
   return null;
@@ -575,7 +884,8 @@ export default function FuelMonitoringPage() {
   const [isVehicleDropdownOpen, setIsVehicleDropdownOpen] = useState(false);
   const vehicleDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Kota Tujuan / Rute
+  // Kota Asal & Kota Tujuan / Rute (Default Asal: Kediri, Jawa Timur)
+  const [originCity, setOriginCity] = useState("Kediri");
   const [destination, setDestination] = useState("");
   const [citySearch, setCitySearch] = useState("");
   const [isCityDropdownOpen, setIsCityDropdownOpen] = useState(false);
@@ -607,11 +917,12 @@ export default function FuelMonitoringPage() {
 
   // Odometer & Jarak
   const [distanceMode, setDistanceMode] = useState<"odometer" | "manual_km">("odometer");
+  const [tripType, setTripType] = useState<"single" | "round_trip">("single");
   const [startKm, setStartKm] = useState<number | string>(12000);
-  const [endKm, setEndKm] = useState<number | string>(12250);
-  const [manualDistance, setManualDistance] = useState<number | string>(250);
+  const [endKm, setEndKm] = useState<number | string>(12000);
+  const [manualDistance, setManualDistance] = useState<number | string>(0);
 
-  // Otomatis hitung jarak sesuai lokasi aplikasi
+  // Otomatis hitung jarak sesuai lokasi aplikasi (Kediri)
   const [isAutoDistance, setIsAutoDistance] = useState(false);
   const [autoDistanceNote, setAutoDistanceNote] = useState("");
   const [userHasCustomKm, setUserHasCustomKm] = useState(false);
@@ -622,35 +933,48 @@ export default function FuelMonitoringPage() {
       setIsAutoDistance(false);
       return;
     }
+    const mult = tripType === "round_trip" ? 2 : 1;
     if (!userHasCustomKm || !manualDistance || manualDistance === 0) {
-      const autoDist = getAutoDistanceForDestination(destination, destinations);
+      const autoDist = getAutoDistanceForDestination(destination, originCity, destinations, mult);
       if (autoDist && autoDist > 0) {
         setManualDistance(autoDist);
         const s = Number(startKm) || 12000;
         setEndKm(s + autoDist);
         setIsAutoDistance(true);
-        setAutoDistanceNote(`± ${autoDist} KM dari Kantor Surabaya (Lokasi Aplikasi)`);
+        const parsed = parseRouteString(destination, originCity);
+        const tripLabel = mult === 2 || parsed.isRoundTrip ? "PP" : "1x jalan";
+        setAutoDistanceNote(`± ${autoDist} KM (${originCity} ➔ ${parsed.cleanDestination || destination}, ${tripLabel})`);
       }
     }
-  }, [destination, destinations, userHasCustomKm, startKm]);
+  }, [destination, originCity, destinations, userHasCustomKm, startKm, tripType]);
 
-  const handleRecalculateAutoDistance = (targetCity?: string) => {
+  const handleRecalculateAutoDistance = (
+    targetCity?: string,
+    baseCity?: string,
+    forceTripType?: "single" | "round_trip"
+  ) => {
     const cityToLookup = targetCity || destination;
+    const fromCity = baseCity || originCity || "Kediri";
+    const effectiveTripType = forceTripType || tripType;
+    const mult = effectiveTripType === "round_trip" ? 2 : 1;
+
     if (!cityToLookup) {
       toast.error("Pilih atau ketik kota tujuan terlebih dahulu!");
       return;
     }
-    const autoDist = getAutoDistanceForDestination(cityToLookup, destinations);
+    const autoDist = getAutoDistanceForDestination(cityToLookup, fromCity, destinations, mult);
     if (autoDist && autoDist > 0) {
       setManualDistance(autoDist);
       const s = Number(startKm) || 12000;
       setEndKm(s + autoDist);
       setIsAutoDistance(true);
       setUserHasCustomKm(false);
-      setAutoDistanceNote(`± ${autoDist} KM dari Kantor Surabaya (Lokasi Aplikasi)`);
-      toast.success(`Jarak ke ${cityToLookup} otomatis dihitung: ± ${autoDist} KM`);
+      const parsed = parseRouteString(cityToLookup, fromCity);
+      const tripLabel = mult === 2 || parsed.isRoundTrip ? "PP" : "1x jalan";
+      setAutoDistanceNote(`± ${autoDist} KM (${fromCity} ➔ ${parsed.cleanDestination || cityToLookup}, ${tripLabel})`);
+      toast.success(`Jarak ${fromCity} ke ${parsed.cleanDestination || cityToLookup} (${tripLabel}) otomatis dihitung: ± ${autoDist} KM`);
     } else {
-      toast.info(`Jarak standar ke "${cityToLookup}" belum terdaftar. Silakan masukkan KM secara manual.`);
+      toast.info(`Jarak ke "${cityToLookup}" belum terdaftar. Silakan masukkan KM secara manual.`);
     }
   };
 
@@ -703,17 +1027,68 @@ export default function FuelMonitoringPage() {
     );
   }, [vehicles, vehicleSearch]);
 
+  const POPULAR_DESTINATIONS_FROM_KEDIRI = useMemo(
+    () => [
+      "Surabaya",
+      "Malang",
+      "Nganjuk",
+      "Tulungagung",
+      "Blitar",
+      "Jombang",
+      "Trenggalek",
+      "Madiun",
+      "Batu",
+      "Mojokerto",
+      "Sidoarjo",
+      "Gresik",
+      "Pasuruan",
+      "Probolinggo",
+      "Ngawi",
+      "Magetan",
+      "Ponorogo",
+      "Lamongan",
+      "Bojonegoro",
+      "Tuban",
+      "Pacitan",
+      "Lumajang",
+      "Jember",
+      "Banyuwangi",
+      "Solo",
+      "Yogyakarta",
+      "Semarang",
+      "Jakarta",
+      "Bandara Dhoho Kediri",
+      "Bandara Juanda Surabaya",
+      "Pare",
+      "Kertosono",
+    ],
+    []
+  );
+
   const masterCities = useMemo(() => {
     const set = new Set<string>();
+    POPULAR_DESTINATIONS_FROM_KEDIRI.forEach((c) => set.add(c));
     destinations.forEach((d: any) => d.city && set.add(d.city));
     INDONESIA_CITIES.forEach((c) => set.add(c));
-    return Array.from(set).sort();
-  }, [destinations]);
+    return Array.from(set);
+  }, [destinations, POPULAR_DESTINATIONS_FROM_KEDIRI]);
 
   const filteredCities = useMemo(() => {
-    if (!citySearch) return masterCities;
-    return masterCities.filter((c) => c.toLowerCase().includes(citySearch.toLowerCase()));
-  }, [masterCities, citySearch]);
+    if (!citySearch) {
+      const popularSet = new Set(POPULAR_DESTINATIONS_FROM_KEDIRI.map((c) => c.toLowerCase()));
+      const others = masterCities.filter((c) => !popularSet.has(c.toLowerCase())).sort();
+      return [...POPULAR_DESTINATIONS_FROM_KEDIRI, ...others];
+    }
+    return masterCities
+      .filter((c) => c.toLowerCase().includes(citySearch.toLowerCase()))
+      .sort((a, b) => {
+        const aStarts = a.toLowerCase().startsWith(citySearch.toLowerCase());
+        const bStarts = b.toLowerCase().startsWith(citySearch.toLowerCase());
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+        return a.localeCompare(b);
+      });
+  }, [masterCities, citySearch, POPULAR_DESTINATIONS_FROM_KEDIRI]);
 
   // Hitung Jarak Tempuh Efektif
   const effectiveDistance = useMemo(() => {
@@ -1375,20 +1750,108 @@ export default function FuelMonitoringPage() {
                 )}
               </div>
 
-              {/* 3. Kota Tujuan / Destinasi Dropdown */}
-              <div ref={cityDropdownRef} className="relative">
-                <label className="block text-xs font-semibold text-surface-300 uppercase tracking-wider mb-1.5">
-                  Kota Tujuan / Destinasi
-                </label>
+              {/* 3a. Kota Asal / Titik Berangkat (Default: Kediri, Jawa Timur) */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-surface-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-cyan-400" />
+                    Kota Asal / Titik Berangkat
+                  </label>
+                  <span className="text-[10px] text-cyan-400 font-medium">
+                    Lokasi Anda: Kediri, Jawa Timur
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {["Kediri", "Surabaya", "Jakarta"].map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => {
+                        setOriginCity(c);
+                        handleRecalculateAutoDistance(destination, c, tripType);
+                      }}
+                      className={cn(
+                        "px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer",
+                        originCity.toLowerCase() === c.toLowerCase()
+                          ? "bg-cyan-500 text-slate-950 font-bold shadow-md shadow-cyan-500/20"
+                          : "bg-surface-900 text-surface-400 border border-surface-700 hover:text-white"
+                      )}
+                    >
+                      {c === "Kediri" ? "📍 Kediri (Lokasi Anda)" : c}
+                    </button>
+                  ))}
+                  <input
+                    type="text"
+                    placeholder="Kota asal lain..."
+                    value={originCity}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setOriginCity(val);
+                      if (destination) {
+                        handleRecalculateAutoDistance(destination, val, tripType);
+                      }
+                    }}
+                    className="flex-1 min-w-[120px] px-3 py-1.5 bg-surface-900 border border-surface-700 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+
+              {/* 3b. Kota Tujuan / Destinasi & Tipe Perjalanan (Sekali Jalan / PP) */}
+              <div ref={cityDropdownRef} className="relative space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-surface-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-amber-400" />
+                    Kota Tujuan / Destinasi
+                  </label>
+                  {/* Tipe Rute Toggle: Sekali Jalan vs PP */}
+                  <div className="flex items-center gap-1 bg-surface-900 p-0.5 rounded-lg border border-surface-700">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTripType("single");
+                        if (destination) {
+                          handleRecalculateAutoDistance(destination, originCity, "single");
+                        }
+                      }}
+                      className={cn(
+                        "px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer",
+                        tripType === "single"
+                          ? "bg-cyan-500 text-slate-950 shadow-sm"
+                          : "text-surface-400 hover:text-white"
+                      )}
+                    >
+                      ➔ 1x Jalan
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTripType("round_trip");
+                        if (destination) {
+                          handleRecalculateAutoDistance(destination, originCity, "round_trip");
+                        }
+                      }}
+                      className={cn(
+                        "px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer",
+                        tripType === "round_trip"
+                          ? "bg-amber-400 text-slate-950 shadow-sm"
+                          : "text-surface-400 hover:text-white"
+                      )}
+                    >
+                      ⇄ Pulang-Pergi (PP)
+                    </button>
+                  </div>
+                </div>
+
                 <div className="relative">
                   <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-500" />
                   <input
                     type="text"
-                    placeholder="Pilih atau ketik kota tujuan..."
+                    placeholder="Pilih atau ketik kota tujuan (cth: Surabaya, Malang, Nganjuk)..."
                     value={destination}
                     onChange={(e) => {
-                      setDestination(e.target.value);
-                      setCitySearch(e.target.value);
+                      const val = e.target.value;
+                      setDestination(val);
+                      setCitySearch(val);
                       setIsCityDropdownOpen(true);
                     }}
                     onFocus={() => setIsCityDropdownOpen(true)}
@@ -1400,6 +1863,10 @@ export default function FuelMonitoringPage() {
                       onClick={() => {
                         setDestination("");
                         setCitySearch("");
+                        setManualDistance(0);
+                        const s = Number(startKm) || 12000;
+                        setEndKm(s);
+                        setIsAutoDistance(false);
                       }}
                       className="absolute right-2.5 top-1/2 -translate-y-1/2 text-surface-400 hover:text-white"
                     >
@@ -1408,12 +1875,70 @@ export default function FuelMonitoringPage() {
                   )}
                 </div>
 
+                {/* Quick Destinasi Populer dari Kediri */}
+                <div className="space-y-1 pt-1">
+                  <span className="text-[10px] text-surface-400 font-medium block">
+                    Destinasi Populer dari Kediri (Klik langsung hitung akurat):
+                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {[
+                      { name: "Surabaya", baseKm: 120 },
+                      { name: "Malang", baseKm: 88 },
+                      { name: "Nganjuk", baseKm: 32 },
+                      { name: "Tulungagung", baseKm: 32 },
+                      { name: "Blitar", baseKm: 42 },
+                      { name: "Jombang", baseKm: 45 },
+                      { name: "Trenggalek", baseKm: 52 },
+                      { name: "Madiun", baseKm: 76 },
+                      { name: "Batu", baseKm: 82 },
+                      { name: "Mojokerto", baseKm: 75 },
+                      { name: "Sidoarjo", baseKm: 105 },
+                      { name: "Solo", baseKm: 175 },
+                      { name: "Semarang", baseKm: 265 },
+                      { name: "Jakarta", baseKm: 710 },
+                      { name: "Bandara Dhoho", baseKm: 15 },
+                      { name: "Bandara Juanda", baseKm: 115 },
+                    ].map((item) => {
+                      const dist = tripType === "round_trip" ? item.baseKm * 2 : item.baseKm;
+                      const isSel = destination.toLowerCase().includes(item.name.toLowerCase());
+                      return (
+                        <button
+                          key={item.name}
+                          type="button"
+                          onClick={() => {
+                            setDestination(item.name);
+                            setCitySearch(item.name);
+                            setIsCityDropdownOpen(false);
+                            setManualDistance(dist);
+                            const s = Number(startKm) || 12000;
+                            setEndKm(s + dist);
+                            setIsAutoDistance(true);
+                            setUserHasCustomKm(false);
+                            setAutoDistanceNote(
+                              `± ${dist} KM (${originCity} ➔ ${item.name}, ${tripType === "round_trip" ? "PP" : "1x jalan"})`
+                            );
+                          }}
+                          className={cn(
+                            "px-2 py-0.5 rounded-lg text-[10px] border transition-all cursor-pointer flex items-center gap-1",
+                            isSel
+                              ? "bg-cyan-500/20 text-cyan-300 border-cyan-500 font-bold"
+                              : "bg-surface-900 text-surface-400 border-surface-800 hover:text-white hover:border-surface-600"
+                          )}
+                        >
+                          <span>{item.name}</span>
+                          <span className="font-mono text-cyan-400 font-semibold">{dist} km</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 {isCityDropdownOpen && (
-                  <div className="absolute z-50 left-0 right-0 mt-1.5 bg-[#0f172a] border border-slate-700 rounded-xl shadow-2xl shadow-black max-h-52 overflow-y-auto py-1 divide-y divide-slate-800/60">
+                  <div className="absolute z-50 left-0 right-0 mt-1 bg-[#0f172a] border border-slate-700 rounded-xl shadow-2xl shadow-black max-h-56 overflow-y-auto py-1 divide-y divide-slate-800/60">
                     {filteredCities.length > 0 ? (
-                      filteredCities.slice(0, 30).map((city) => {
-                        const destObj = destinations.find((d: any) => d.city?.toLowerCase() === city.toLowerCase());
-                        const autoDist = getAutoDistanceForDestination(city, destinations);
+                      filteredCities.slice(0, 35).map((city) => {
+                        const mult = tripType === "round_trip" ? 2 : 1;
+                        const autoDist = getAutoDistanceForDestination(city, originCity, destinations, mult);
                         return (
                           <button
                             key={city}
@@ -1428,15 +1953,17 @@ export default function FuelMonitoringPage() {
                                 setEndKm(s + autoDist);
                                 setIsAutoDistance(true);
                                 setUserHasCustomKm(false);
-                                setAutoDistanceNote(`± ${autoDist} KM dari Kantor Surabaya`);
+                                setAutoDistanceNote(
+                                  `± ${autoDist} KM (${originCity} ➔ ${city}, ${mult === 2 ? "PP" : "1x jalan"})`
+                                );
                               }
                             }}
-                            className="w-full text-left px-3.5 py-2.5 text-sm text-surface-200 hover:bg-slate-800 hover:text-white flex items-center justify-between transition-colors"
+                            className="w-full text-left px-3.5 py-2 text-sm text-surface-200 hover:bg-slate-800 hover:text-white flex items-center justify-between transition-colors"
                           >
                             <span className="font-medium text-white">{city}</span>
                             {autoDist && autoDist > 0 && (
                               <span className="text-[10px] text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20 font-mono">
-                                ± {autoDist} KM
+                                ± {autoDist} KM ({mult === 2 ? "PP" : "1x"} dari {originCity})
                               </span>
                             )}
                           </button>
@@ -1450,7 +1977,7 @@ export default function FuelMonitoringPage() {
                   </div>
                 )}
 
-                {/* Status Jarak Otomatis Sesuai Lokasi Aplikasi */}
+                {/* Status Jarak Otomatis Sesuai Lokasi Asal & Tujuan */}
                 {destination && (
                   <div className="flex items-center justify-between mt-1 text-[11px] px-0.5">
                     {isAutoDistance ? (
@@ -1461,14 +1988,14 @@ export default function FuelMonitoringPage() {
                     ) : (
                       <span className="text-slate-400 flex items-center gap-1">
                         <MapPin className="w-3.5 h-3.5 text-slate-500" />
-                        Jarak perjalanan: <strong className="text-white font-mono">{effectiveDistance} KM</strong>
+                        Jarak perjalanan: <strong className="text-white font-mono">{effectiveDistance} KM</strong> ({originCity} ➔ {destination})
                       </span>
                     )}
                     <button
                       type="button"
-                      onClick={() => handleRecalculateAutoDistance(destination)}
+                      onClick={() => handleRecalculateAutoDistance(destination, originCity, tripType)}
                       className="text-[11px] text-amber-400 hover:text-amber-300 hover:underline flex items-center gap-1 ml-auto cursor-pointer"
-                      title="Hitung otomatis jarak dari Kantor Surabaya PT TRANS KP"
+                      title={`Hitung otomatis jarak dari ${originCity} ke ${destination}`}
                     >
                       <RotateCcw className="w-2.5 h-2.5" />
                       Hitung Ulang Jarak
