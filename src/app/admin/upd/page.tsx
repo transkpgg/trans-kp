@@ -788,225 +788,38 @@ export default function UpdCalculatorPage() {
             </div>
           </div>
 
-          {/* Breakdown Cards & Live Calculation */}
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-brand-400" />
-                  Rincian Jam Makan & Uang Saku Harian
-                </h2>
-                <p className="text-xs text-surface-400">
-                  Total {calculationResult.totalDays} hari perjalanan. Anda dapat mengubah status Hari Kerja/Libur atau mencentang manual slot makan di bawah.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2 text-xs">
-                <span className="flex items-center gap-1.5 text-surface-400">
-                  <span className="w-2.5 h-2.5 rounded bg-blue-500/20 border border-blue-500/50" /> Hari Kerja
-                </span>
-                <span className="flex items-center gap-1.5 text-surface-400">
-                  <span className="w-2.5 h-2.5 rounded bg-purple-500/20 border border-purple-500/50" /> Hari Libur
-                </span>
-              </div>
-            </div>
-
-            {calculationResult.days.length === 0 ? (
-              <div className="glass-card p-10 text-center border border-dashed border-surface-800">
-                <AlertCircle className="w-10 h-10 text-surface-600 mx-auto mb-3" />
-                <p className="text-surface-300 font-medium">Rentang waktu belum valid</p>
-                <p className="text-xs text-surface-500 mt-1">
-                  Pastikan waktu kepulangan berada setelah waktu keberangkatan.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {calculationResult.days.map((day, idx) => (
-                  <div
-                    key={day.dateStr}
-                    className={cn(
-                      "glass-card overflow-hidden border transition-all",
-                      day.isHoliday ? "border-purple-500/30" : "border-surface-800"
-                    )}
-                  >
-                    {/* Day Card Header */}
-                    <div className={cn(
-                      "p-4 flex flex-wrap items-center justify-between gap-3 border-b",
-                      day.isHoliday
-                        ? "bg-purple-950/20 border-purple-900/30"
-                        : "bg-surface-900/40 border-surface-800"
-                    )}>
-                      <div className="flex items-center gap-3">
-                        <span className="w-7 h-7 rounded-lg bg-surface-800 text-brand-400 font-bold text-xs flex items-center justify-center border border-surface-700">
-                          H{idx + 1}
-                        </span>
-                        <div>
-                          <p className="font-bold text-white text-sm sm:text-base">
-                            {day.formattedDate}
-                          </p>
-                          <p className="text-[11px] text-surface-400">
-                            {idx === 0 && idx === calculationResult.days.length - 1
-                              ? `Dinas: ${format(new Date(departureDateTime), "HH:mm")} s/d ${format(new Date(returnDateTime), "HH:mm")}`
-                              : idx === 0
-                              ? `Mulai berangkat: ${format(new Date(departureDateTime), "HH:mm")} WIB`
-                              : idx === calculationResult.days.length - 1
-                              ? `Pulang tiba: ${format(new Date(returnDateTime), "HH:mm")} WIB`
-                              : "Dinas penuh 24 jam"}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        {/* Toggle Hari Kerja vs Libur */}
-                        <button
-                          type="button"
-                          onClick={() => handleToggleHoliday(day.dateStr)}
-                          className={cn(
-                            "px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
-                            day.isHoliday
-                              ? "bg-purple-500/20 text-purple-300 border border-purple-500/40 hover:bg-purple-500/30"
-                              : "bg-surface-800 text-surface-300 border border-surface-700 hover:bg-surface-750 hover:text-white"
-                          )}
-                          title="Klik untuk mengubah tarif Hari Kerja / Hari Libur"
-                        >
-                          {day.isHoliday ? "🏖️ Hari Libur" : "🏢 Hari Kerja"}
-                          <span className="text-[10px] text-surface-400 underline">(ganti)</span>
-                        </button>
-
-                        {/* Subtotal Hari */}
-                        <div className="text-right pl-3 border-l border-surface-800">
-                          <p className="text-[10px] text-surface-400 uppercase font-semibold">Subtotal Hari</p>
-                          <p className="text-base font-bold text-emerald-400">
-                            {formatRupiah(day.subtotal)}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Day Slots Grid */}
-                    <div className="p-4 sm:p-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
-                      {/* 5 Slot Jam Makan */}
-                      {day.meals.map((meal) => (
-                        <div
-                          key={meal.key}
-                          onClick={() => handleToggleMeal(day.dateStr, meal.key)}
-                          className={cn(
-                            "p-3 rounded-xl border text-center transition-all cursor-pointer select-none",
-                            meal.active
-                              ? "bg-brand-500/10 border-brand-500/40 text-brand-300 shadow-sm"
-                              : "bg-surface-900/30 border-surface-800/80 text-surface-500 opacity-60 hover:opacity-90"
-                          )}
-                        >
-                          <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-[10px] font-bold tracking-wider uppercase px-1.5 py-0.5 rounded bg-surface-800/60 text-surface-300">
-                              {meal.timeStr}
-                            </span>
-                            <input
-                              type="checkbox"
-                              checked={meal.active}
-                              onChange={() => {}}
-                              className="rounded border-surface-700 text-brand-500 focus:ring-0 cursor-pointer"
-                            />
-                          </div>
-                          <p className="font-semibold text-xs text-white truncate">{meal.label}</p>
-                          <p className={cn("text-xs font-bold mt-1", meal.active ? "text-brand-400" : "text-surface-500 line-through")}>
-                            {formatRupiah(meal.rate)}
-                          </p>
-                        </div>
-                      ))}
-
-                      {/* Bermalam (B) */}
-                      <div
-                        onClick={() => handleToggleOvernight(day.dateStr)}
-                        className={cn(
-                          "p-3 rounded-xl border text-center transition-all cursor-pointer select-none",
-                          day.overnight.active
-                            ? "bg-amber-500/10 border-amber-500/40 text-amber-300 shadow-sm"
-                            : "bg-surface-900/30 border-surface-800/80 text-surface-500 opacity-60 hover:opacity-90"
-                        )}
-                      >
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-[10px] font-bold tracking-wider uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 flex items-center gap-1">
-                            <Moon className="w-2.5 h-2.5" /> Inap
-                          </span>
-                          <input
-                            type="checkbox"
-                            checked={day.overnight.active}
-                            onChange={() => {}}
-                            className="rounded border-surface-700 text-amber-500 focus:ring-0 cursor-pointer"
-                          />
-                        </div>
-                        <p className="font-semibold text-xs text-white">Bermalam (B)</p>
-                        <p className={cn("text-xs font-bold mt-1", day.overnight.active ? "text-amber-400" : "text-surface-500 line-through")}>
-                          {formatRupiah(day.overnight.rate)}
-                        </p>
-                      </div>
-
-                      {/* Uang Rokok */}
-                      <div
-                        onClick={() => handleToggleCigarette(day.dateStr)}
-                        className={cn(
-                          "p-3 rounded-xl border text-center transition-all cursor-pointer select-none",
-                          day.cigarette.active
-                            ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-300 shadow-sm"
-                            : "bg-surface-900/30 border-surface-800/80 text-surface-500 opacity-60 hover:opacity-90"
-                        )}
-                      >
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-[10px] font-bold tracking-wider uppercase px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 flex items-center gap-1">
-                            <Cigarette className="w-2.5 h-2.5" /> Rokok
-                          </span>
-                          <input
-                            type="checkbox"
-                            checked={day.cigarette.active}
-                            onChange={() => {}}
-                            className="rounded border-surface-700 text-emerald-500 focus:ring-0 cursor-pointer"
-                          />
-                        </div>
-                        <p className="font-semibold text-xs text-white">Uang Rokok</p>
-                        <p className={cn("text-xs font-bold mt-1", day.cigarette.active ? "text-emerald-400" : "text-surface-500 line-through")}>
-                          {formatRupiah(day.cigarette.rate)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Sticky / Grand Total Summary Card */}
-          <div className="glass-card p-6 border border-brand-500/30 bg-gradient-to-r from-surface-900 via-surface-900 to-brand-950/20 shadow-xl">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {/* Grand Total Summary Card - Directly visible at top without scrolling */}
+          <div className="glass-card p-4 sm:p-5 border border-brand-500/40 bg-gradient-to-r from-surface-900 via-surface-900 to-brand-950/30 shadow-lg">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 lg:gap-5">
                 <div>
-                  <p className="text-xs text-surface-400 uppercase font-semibold">Total Hari</p>
-                  <p className="text-xl font-bold text-white mt-0.5">{calculationResult.totalDays} Hari</p>
+                  <p className="text-[11px] text-surface-400 uppercase font-semibold">Total Hari</p>
+                  <p className="text-lg font-bold text-white mt-0.5">{calculationResult.totalDays} Hari</p>
                 </div>
                 <div>
-                  <p className="text-xs text-surface-400 uppercase font-semibold">Total Uang Makan</p>
-                  <p className="text-xl font-bold text-brand-400 mt-0.5">
+                  <p className="text-[11px] text-surface-400 uppercase font-semibold">Uang Makan</p>
+                  <p className="text-lg font-bold text-brand-400 mt-0.5">
                     {formatRupiah(calculationResult.totalMealAllowance)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-surface-400 uppercase font-semibold">Total Bermalam</p>
-                  <p className="text-xl font-bold text-amber-400 mt-0.5">
+                  <p className="text-[11px] text-surface-400 uppercase font-semibold">Uang Bermalam</p>
+                  <p className="text-lg font-bold text-amber-400 mt-0.5">
                     {formatRupiah(calculationResult.totalOvernightAllowance)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-surface-400 uppercase font-semibold">Total Uang Rokok</p>
-                  <p className="text-xl font-bold text-emerald-400 mt-0.5">
+                  <p className="text-[11px] text-surface-400 uppercase font-semibold">Uang Rokok</p>
+                  <p className="text-lg font-bold text-emerald-400 mt-0.5">
                     {formatRupiah(calculationResult.totalCigaretteAllowance)}
                   </p>
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 lg:pl-6 lg:border-l border-surface-800">
-                <div>
-                  <p className="text-xs text-surface-400 uppercase font-semibold">TOTAL UPD DITERIMA</p>
-                  <p className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-brand-400">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between lg:justify-end gap-3 lg:pl-6 lg:border-l border-surface-800">
+                <div className="text-left sm:text-right">
+                  <p className="text-[10px] text-surface-400 uppercase font-bold tracking-wider">TOTAL UPD DITERIMA</p>
+                  <p className="text-2xl sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-brand-400">
                     {formatRupiah(calculationResult.grandTotal)}
                   </p>
                 </div>
@@ -1016,10 +829,10 @@ export default function UpdCalculatorPage() {
                     type="button"
                     onClick={handleSaveCalculation}
                     disabled={isSaving || calculationResult.totalDays === 0}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl gradient-brand font-medium text-white hover:shadow-lg hover:shadow-brand-500/25 transition-all text-sm disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl gradient-brand font-semibold text-white hover:shadow-lg hover:shadow-brand-500/25 transition-all text-xs disabled:opacity-50"
                   >
-                    <Plus className="w-4 h-4" />
-                    {isSaving ? "Menyimpan..." : "Simpan UPD"}
+                    <Plus className="w-3.5 h-3.5" />
+                    {isSaving ? "Menyimpan..." : "Simpan"}
                   </button>
 
                   <button
@@ -1036,35 +849,167 @@ export default function UpdCalculatorPage() {
                         dateRecorded: new Date().toISOString(),
                       })
                     }
-                    className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-surface-800 border border-surface-700 text-surface-200 hover:text-white hover:bg-surface-700 transition-all text-sm"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-surface-800 border border-surface-700 text-surface-200 hover:text-white hover:bg-surface-700 transition-all text-xs"
                     title="Cetak Slip Kwitansi UPD"
                   >
-                    <Printer className="w-4 h-4 text-brand-400" />
-                    Cetak Slip
+                    <Printer className="w-3.5 h-3.5 text-brand-400" />
+                    Cetak
                   </button>
 
                   <button
                     type="button"
                     onClick={handleExportExcel}
-                    className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 transition-all text-sm"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 transition-all text-xs"
                     title="Download Excel"
                   >
-                    <Download className="w-4 h-4" />
+                    <Download className="w-3.5 h-3.5" />
                     Excel
                   </button>
 
                   <button
                     type="button"
                     onClick={handleConvertToBon}
-                    className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 hover:bg-amber-500/20 transition-all text-sm font-medium"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 hover:bg-amber-500/20 transition-all text-xs font-semibold"
                     title="Buat Bon Pengemudi dengan nominal UPD ini"
                   >
-                    <Receipt className="w-4 h-4 text-amber-400" />
-                    Buat Bon
+                    <Receipt className="w-3.5 h-3.5 text-amber-400" />
+                    Bon
                   </button>
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Compact Daily Breakdown Section */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between text-xs px-1">
+              <span className="font-bold text-white flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-brand-400" />
+                Rincian Jadwal Makan ({calculationResult.totalDays} Hari)
+              </span>
+              <span className="text-[11px] text-surface-400 hidden sm:inline">
+                Klik tombol jam makan / inap / rokok di bawah untuk aktifkan atau nonaktifkan
+              </span>
+            </div>
+
+            {calculationResult.days.length === 0 ? (
+              <div className="glass-card p-6 text-center border border-dashed border-surface-800">
+                <p className="text-surface-400 text-xs">Rentang waktu belum valid</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {calculationResult.days.map((day, idx) => (
+                  <div
+                    key={day.dateStr}
+                    className={cn(
+                      "p-3 rounded-xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-3",
+                      day.isHoliday
+                        ? "bg-purple-950/15 border-purple-800/40"
+                        : "bg-surface-900/60 border-surface-800"
+                    )}
+                  >
+                    {/* Day & Date Info */}
+                    <div className="flex items-center gap-2.5 min-w-[210px]">
+                      <span className="w-6 h-6 rounded-md bg-surface-800 text-brand-400 font-bold text-xs flex items-center justify-center border border-surface-700">
+                        H{idx + 1}
+                      </span>
+                      <div>
+                        <p className="text-xs font-bold text-white leading-tight">
+                          {day.formattedDate}
+                        </p>
+                        <p className="text-[10px] text-surface-400 leading-tight mt-0.5">
+                          {idx === 0 && idx === calculationResult.days.length - 1
+                            ? `${format(new Date(departureDateTime), "HH:mm")} - ${format(new Date(returnDateTime), "HH:mm")}`
+                            : idx === 0
+                            ? `Mulai ${format(new Date(departureDateTime), "HH:mm")} WIB`
+                            : idx === calculationResult.days.length - 1
+                            ? `Pulang ${format(new Date(returnDateTime), "HH:mm")} WIB`
+                            : "Dinas 24 Jam"}
+                        </p>
+                      </div>
+
+                      {/* Holiday Toggle */}
+                      <button
+                        type="button"
+                        onClick={() => handleToggleHoliday(day.dateStr)}
+                        className={cn(
+                          "ml-auto md:ml-1 px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all border cursor-pointer",
+                          day.isHoliday
+                            ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
+                            : "bg-surface-800 text-surface-300 border-surface-700 hover:text-white"
+                        )}
+                        title="Klik untuk ganti Hari Kerja / Libur"
+                      >
+                        {day.isHoliday ? "🏖️ Libur" : "🏢 Kerja"}
+                      </button>
+                    </div>
+
+                    {/* Compact Interactive Chips for Meals, Overnight, Cigarette */}
+                    <div className="flex flex-wrap items-center gap-1.5 flex-1 justify-start md:justify-center">
+                      {day.meals.map((meal) => (
+                        <button
+                          key={meal.key}
+                          type="button"
+                          onClick={() => handleToggleMeal(day.dateStr, meal.key)}
+                          className={cn(
+                            "px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all flex items-center gap-1.5 border cursor-pointer select-none",
+                            meal.active
+                              ? "bg-brand-500/20 text-brand-300 border-brand-500/50 shadow-sm"
+                              : "bg-surface-900/40 text-surface-500 border-surface-800/80 line-through opacity-50 hover:opacity-80"
+                          )}
+                          title={`${meal.label} jam ${meal.timeStr} (${formatRupiah(meal.rate)})`}
+                        >
+                          <span className="font-mono text-[10px] opacity-75">{meal.timeStr}</span>
+                          <span className="font-semibold">{formatRupiah(meal.rate)}</span>
+                        </button>
+                      ))}
+
+                      {/* Inap Chip */}
+                      <button
+                        type="button"
+                        onClick={() => handleToggleOvernight(day.dateStr)}
+                        className={cn(
+                          "px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all flex items-center gap-1.5 border cursor-pointer select-none",
+                          day.overnight.active
+                            ? "bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm"
+                            : "bg-surface-900/40 text-surface-500 border-surface-800/80 line-through opacity-50 hover:opacity-80"
+                        )}
+                        title={`Bermalam (${formatRupiah(day.overnight.rate)})`}
+                      >
+                        <Moon className="w-2.5 h-2.5 text-amber-400" />
+                        <span>Inap</span>
+                        <span className="font-semibold">{formatRupiah(day.overnight.rate)}</span>
+                      </button>
+
+                      {/* Rokok Chip */}
+                      <button
+                        type="button"
+                        onClick={() => handleToggleCigarette(day.dateStr)}
+                        className={cn(
+                          "px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all flex items-center gap-1.5 border cursor-pointer select-none",
+                          day.cigarette.active
+                            ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-sm"
+                            : "bg-surface-900/40 text-surface-500 border-surface-800/80 line-through opacity-50 hover:opacity-80"
+                        )}
+                        title={`Uang Rokok (${formatRupiah(day.cigarette.rate)})`}
+                      >
+                        <Cigarette className="w-2.5 h-2.5 text-emerald-400" />
+                        <span>Rokok</span>
+                        <span className="font-semibold">{formatRupiah(day.cigarette.rate)}</span>
+                      </button>
+                    </div>
+
+                    {/* Day Subtotal */}
+                    <div className="flex items-center justify-between md:flex-col md:items-end min-w-[95px] pt-1 md:pt-0 border-t md:border-t-0 border-surface-800/60">
+                      <span className="text-[10px] text-surface-400 uppercase font-semibold">Subtotal</span>
+                      <span className="text-sm font-bold text-emerald-400">
+                        {formatRupiah(day.subtotal)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       ) : (
