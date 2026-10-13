@@ -46,8 +46,37 @@ import {
 } from "@/lib/upd-calculator";
 import { INDONESIA_CITIES } from "@/lib/indonesia-cities";
 
-const HOURS_24 = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
-const MINUTES_60 = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"));
+// Helper to parse manual time input (e.g. "08.00", "08:00", "8.00", "1430", "14")
+const parseTimeInput = (val: string): { hour: string; minute: string; formatted: string } => {
+  if (!val) return { hour: "00", minute: "00", formatted: "00.00" };
+  const cleaned = val.trim().replace(":", ".");
+
+  // If user entered 3 or 4 digits without separator e.g. "800", "0800" or "1430"
+  if (/^\d{3,4}$/.test(cleaned)) {
+    const padded = cleaned.padStart(4, "0");
+    const h = Math.min(23, Math.max(0, parseInt(padded.slice(0, 2), 10) || 0));
+    const m = Math.min(59, Math.max(0, parseInt(padded.slice(2, 4), 10) || 0));
+    const hourStr = String(h).padStart(2, "0");
+    const minStr = String(m).padStart(2, "0");
+    return { hour: hourStr, minute: minStr, formatted: `${hourStr}.${minStr}` };
+  }
+
+  // Normal split by dot or colon
+  const parts = cleaned.split(".");
+  let h = parseInt(parts[0], 10);
+  if (isNaN(h)) h = 0;
+  h = Math.min(23, Math.max(0, h));
+
+  let m = 0;
+  if (parts.length > 1 && parts[1] !== "") {
+    m = parseInt(parts[1], 10);
+    if (isNaN(m)) m = 0;
+    m = Math.min(59, Math.max(0, m));
+  }
+  const hourStr = String(h).padStart(2, "0");
+  const minStr = String(m).padStart(2, "0");
+  return { hour: hourStr, minute: minStr, formatted: `${hourStr}.${minStr}` };
+};
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -86,13 +115,15 @@ export default function UpdCalculatorPage() {
   const [noSpd, setNoSpd] = useState("");
   const [notes, setNotes] = useState("");
 
-  // Format 24 Jam (00.00 s/d 23.59) tanpa AM/PM
+  // Format 24 Jam (00.00 s/d 23.59) diketik manual tanpa list & tanpa AM/PM
   const todayStr = format(new Date(), "yyyy-MM-dd");
   const [departureDate, setDepartureDate] = useState(todayStr);
+  const [departureTimeText, setDepartureTimeText] = useState("06.00");
   const [departureHour, setDepartureHour] = useState("06");
   const [departureMinute, setDepartureMinute] = useState("00");
 
   const [returnDate, setReturnDate] = useState(todayStr);
+  const [returnTimeText, setReturnTimeText] = useState("20.00");
   const [returnHour, setReturnHour] = useState("20");
   const [returnMinute, setReturnMinute] = useState("00");
 
@@ -260,30 +291,38 @@ export default function UpdCalculatorPage() {
 
     if (type === "today_half") {
       setDepartureDate(today);
+      setDepartureTimeText("07.00");
       setDepartureHour("07");
       setDepartureMinute("00");
       setReturnDate(today);
+      setReturnTimeText("15.00");
       setReturnHour("15");
       setReturnMinute("00");
     } else if (type === "today_full") {
       setDepartureDate(today);
+      setDepartureTimeText("06.00");
       setDepartureHour("06");
       setDepartureMinute("00");
       setReturnDate(today);
+      setReturnTimeText("21.30");
       setReturnHour("21");
       setReturnMinute("30");
     } else if (type === "twodays") {
       setDepartureDate(today);
+      setDepartureTimeText("07.00");
       setDepartureHour("07");
       setDepartureMinute("00");
       setReturnDate(tomorrow);
+      setReturnTimeText("17.00");
       setReturnHour("17");
       setReturnMinute("00");
     } else if (type === "threedays") {
       setDepartureDate(today);
+      setDepartureTimeText("06.00");
       setDepartureHour("06");
       setDepartureMinute("00");
       setReturnDate(dayAfter);
+      setReturnTimeText("20.00");
       setReturnHour("20");
       setReturnMinute("00");
     }
@@ -812,12 +851,12 @@ export default function UpdCalculatorPage() {
                 )}
               </div>
 
-              {/* Tanggal & Jam Berangkat (Format 24 Jam: 00.00 - 23.59) */}
+              {/* Tanggal & Jam Berangkat (Ketik Manual 24 Jam: 00.00 - 23.59) */}
               <div className="space-y-1.5">
                 <label className="block text-xs font-semibold text-brand-300 uppercase tracking-wider flex items-center justify-between">
                   <span>Keberangkatan <span className="text-red-400">*</span></span>
                   <span className="text-[10px] text-brand-400 font-mono font-bold">
-                    Pukul {departureHour}.{departureMinute}
+                    Pukul {departureHour}.{departureMinute} WIB
                   </span>
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -830,28 +869,28 @@ export default function UpdCalculatorPage() {
                       className="w-full pl-9 pr-2 py-2.5 bg-surface-900 border border-brand-500/40 text-white rounded-xl focus:outline-none focus:border-brand-500 text-sm"
                     />
                   </div>
-                  <div className="flex items-center justify-between gap-1 bg-surface-900 border border-brand-500/40 rounded-xl px-2.5 py-1.5">
-                    <Clock className="w-3.5 h-3.5 text-brand-400 shrink-0" />
-                    <span className="text-[10px] text-surface-400 font-semibold uppercase">Jam</span>
-                    <select
-                      value={departureHour}
-                      onChange={(e) => setDepartureHour(e.target.value)}
-                      className="bg-surface-800 text-white font-mono font-bold text-xs px-1.5 py-1.5 rounded border border-surface-700 focus:outline-none focus:border-brand-500 cursor-pointer"
-                    >
-                      {HOURS_24.map((h) => (
-                        <option key={h} value={h}>{h}</option>
-                      ))}
-                    </select>
-                    <span className="font-bold text-surface-400">:</span>
-                    <select
-                      value={departureMinute}
-                      onChange={(e) => setDepartureMinute(e.target.value)}
-                      className="bg-surface-800 text-white font-mono font-bold text-xs px-1.5 py-1.5 rounded border border-surface-700 focus:outline-none focus:border-brand-500 cursor-pointer"
-                    >
-                      {MINUTES_60.map((m) => (
-                        <option key={m} value={m}>{m}</option>
-                      ))}
-                    </select>
+                  <div className="relative">
+                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-400" />
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="Ketik jam: 06.00"
+                      value={departureTimeText}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setDepartureTimeText(val);
+                        const parsed = parseTimeInput(val);
+                        setDepartureHour(parsed.hour);
+                        setDepartureMinute(parsed.minute);
+                      }}
+                      onBlur={() => {
+                        const parsed = parseTimeInput(departureTimeText);
+                        setDepartureTimeText(parsed.formatted);
+                        setDepartureHour(parsed.hour);
+                        setDepartureMinute(parsed.minute);
+                      }}
+                      className="w-full pl-9 pr-3 py-2.5 bg-surface-900 border border-brand-500/40 text-white rounded-xl focus:outline-none focus:border-brand-500 font-mono font-bold text-sm tracking-wider"
+                    />
                   </div>
                 </div>
                 {/* Shortcut Jam Berangkat */}
@@ -864,6 +903,7 @@ export default function UpdCalculatorPage() {
                         key={t}
                         type="button"
                         onClick={() => {
+                          setDepartureTimeText(t);
                           setDepartureHour(h);
                           setDepartureMinute(m);
                         }}
@@ -881,12 +921,12 @@ export default function UpdCalculatorPage() {
                 </div>
               </div>
 
-              {/* Tanggal & Jam Pulang (Format 24 Jam: 00.00 - 23.59) */}
+              {/* Tanggal & Jam Pulang (Ketik Manual 24 Jam: 00.00 - 23.59) */}
               <div className="space-y-1.5">
                 <label className="block text-xs font-semibold text-emerald-300 uppercase tracking-wider flex items-center justify-between">
                   <span>Kepulangan <span className="text-red-400">*</span></span>
                   <span className="text-[10px] text-emerald-400 font-mono font-bold">
-                    Pukul {returnHour}.{returnMinute}
+                    Pukul {returnHour}.{returnMinute} WIB
                   </span>
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -899,28 +939,28 @@ export default function UpdCalculatorPage() {
                       className="w-full pl-9 pr-2 py-2.5 bg-surface-900 border border-emerald-500/40 text-white rounded-xl focus:outline-none focus:border-emerald-500 text-sm"
                     />
                   </div>
-                  <div className="flex items-center justify-between gap-1 bg-surface-900 border border-emerald-500/40 rounded-xl px-2.5 py-1.5">
-                    <Clock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <span className="text-[10px] text-surface-400 font-semibold uppercase">Jam</span>
-                    <select
-                      value={returnHour}
-                      onChange={(e) => setReturnHour(e.target.value)}
-                      className="bg-surface-800 text-white font-mono font-bold text-xs px-1.5 py-1.5 rounded border border-surface-700 focus:outline-none focus:border-emerald-500 cursor-pointer"
-                    >
-                      {HOURS_24.map((h) => (
-                        <option key={h} value={h}>{h}</option>
-                      ))}
-                    </select>
-                    <span className="font-bold text-surface-400">:</span>
-                    <select
-                      value={returnMinute}
-                      onChange={(e) => setReturnMinute(e.target.value)}
-                      className="bg-surface-800 text-white font-mono font-bold text-xs px-1.5 py-1.5 rounded border border-surface-700 focus:outline-none focus:border-emerald-500 cursor-pointer"
-                    >
-                      {MINUTES_60.map((m) => (
-                        <option key={m} value={m}>{m}</option>
-                      ))}
-                    </select>
+                  <div className="relative">
+                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400" />
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="Ketik jam: 20.00"
+                      value={returnTimeText}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setReturnTimeText(val);
+                        const parsed = parseTimeInput(val);
+                        setReturnHour(parsed.hour);
+                        setReturnMinute(parsed.minute);
+                      }}
+                      onBlur={() => {
+                        const parsed = parseTimeInput(returnTimeText);
+                        setReturnTimeText(parsed.formatted);
+                        setReturnHour(parsed.hour);
+                        setReturnMinute(parsed.minute);
+                      }}
+                      className="w-full pl-9 pr-3 py-2.5 bg-surface-900 border border-emerald-500/40 text-white rounded-xl focus:outline-none focus:border-emerald-500 font-mono font-bold text-sm tracking-wider"
+                    />
                   </div>
                 </div>
                 {/* Shortcut Jam Kepulangan */}
@@ -933,6 +973,7 @@ export default function UpdCalculatorPage() {
                         key={t}
                         type="button"
                         onClick={() => {
+                          setReturnTimeText(t);
                           setReturnHour(h);
                           setReturnMinute(m);
                         }}
