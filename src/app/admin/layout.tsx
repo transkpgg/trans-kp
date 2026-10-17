@@ -80,7 +80,7 @@ export default function AdminLayout({
   };
 
   return (
-    <div className="min-h-screen bg-surface-950 flex relative">
+    <div className="min-h-screen bg-surface-950 flex relative w-full max-w-full overflow-x-hidden">
       
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
@@ -154,7 +154,7 @@ export default function AdminLayout({
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col min-w-0 min-h-screen">
+      <main className="flex-1 flex flex-col min-w-0 min-h-screen w-full max-w-full overflow-x-hidden">
         {/* Header */}
         <header className="sticky top-0 z-30 bg-surface-950/80 backdrop-blur-xl border-b border-surface-800/50 h-16 flex items-center justify-between px-4 lg:px-8">
           <div className="flex items-center gap-4">

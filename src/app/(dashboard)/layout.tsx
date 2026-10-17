@@ -37,7 +37,7 @@ export default function DashboardLayout({
   };
 
   return (
-    <div className="min-h-screen bg-surface-950 flex flex-col md:flex-row relative">
+    <div className="min-h-screen bg-surface-950 flex flex-col md:flex-row relative w-full max-w-full overflow-x-hidden">
       {/* Desktop Sidebar (hidden on mobile) */}
       <aside className="hidden md:flex w-64 flex-col border-r border-surface-800 bg-surface-900/50 backdrop-blur-xl h-screen sticky top-0">
         <div className="p-6 border-b border-surface-800">
@@ -90,7 +90,7 @@ export default function DashboardLayout({
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col min-h-screen relative pb-20 md:pb-0 max-w-lg mx-auto md:max-w-none w-full">
+      <main className="flex-1 flex flex-col min-h-screen relative pb-20 md:pb-0 w-full max-w-full overflow-x-hidden">
         {/* Mobile Header (hidden on desktop) */}
         <header className="md:hidden sticky top-0 z-40 bg-surface-950/80 backdrop-blur-xl border-b border-surface-800/50 p-4">
           <div className="flex items-center justify-between">
@@ -105,9 +105,11 @@ export default function DashboardLayout({
         </header>
         
         {/* Decorative background elements for main content */}
-        <div className="absolute top-[-20%] right-[-10%] w-[50%] h-[50%] bg-brand-500/10 rounded-full blur-[120px] pointer-events-none" />
+        <div className="absolute inset-0 overflow-hidden pointer-events-none -z-10">
+          <div className="absolute top-[-20%] right-0 w-[50%] h-[50%] bg-brand-500/10 rounded-full blur-[120px]" />
+        </div>
 
-        <div className="flex-1 p-4 md:p-8 z-10 w-full relative">
+        <div className="flex-1 p-4 md:p-8 z-10 w-full max-w-full overflow-x-hidden relative">
           {children}
         </div>
       </main>

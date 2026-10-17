@@ -22,7 +22,7 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="space-y-6 pb-6 slide-up">
+    <div className="space-y-6 pb-6 slide-up w-full max-w-full overflow-x-hidden">
       
       {/* Avatar Header */}
       <div className="flex flex-col items-center justify-center pt-8 pb-6">
