@@ -27,8 +27,8 @@ export async function middleware(request: NextRequest) {
       // Verifikasi token
       const { payload } = await jose.jwtVerify(token, JWT_SECRET);
       
-      // Jika mencoba akses admin tapi bukan admin (kecuali menu Hitung UPD yang terbuka untuk semua staf & pengemudi)
-      if (path.startsWith('/admin') && !path.startsWith('/admin/upd') && payload.role === 'karyawan') {
+      // Jika mencoba akses admin tapi bukan admin (kecuali menu Hitung UPD dan E-Toll yang terbuka untuk semua staf & pengemudi)
+      if (path.startsWith('/admin') && !path.startsWith('/admin/upd') && !path.startsWith('/admin/etoll') && payload.role === 'karyawan') {
         return NextResponse.redirect(new URL('/home', request.url));
       }
       

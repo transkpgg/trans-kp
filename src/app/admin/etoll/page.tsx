@@ -592,57 +592,57 @@ export default function EtollPage() {
 
   return (
     <>
-      <div className="space-y-6 slide-up">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="space-y-3.5 sm:space-y-6 slide-up">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Manajemen E-Toll</h1>
-          <p className="text-sm text-surface-400 mt-1">Pantau penggunaan dan pengembalian kartu E-Toll pengemudi.</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">Manajemen E-Toll</h1>
+          <p className="text-xs sm:text-sm text-surface-400 mt-0.5 sm:mt-1">Pantau penggunaan dan pengembalian kartu E-Toll pengemudi.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
           <button
             onClick={downloadEtollTemplate}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-surface-700 font-medium text-surface-300 hover:bg-surface-800 hover:text-white transition-all text-sm"
+            className="flex items-center justify-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl border border-surface-700 font-medium text-surface-300 hover:bg-surface-800 hover:text-white transition-all text-xs sm:text-sm"
           >
             <Download className="w-4 h-4" />
             Template
           </button>
-          <label className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-500/30 font-medium text-emerald-400 hover:bg-emerald-500/10 transition-all text-sm cursor-pointer ${isUploadingEtoll ? 'opacity-50 pointer-events-none' : ''}`}>
+          <label className={`flex items-center justify-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl border border-emerald-500/30 font-medium text-emerald-400 hover:bg-emerald-500/10 transition-all text-xs sm:text-sm cursor-pointer ${isUploadingEtoll ? 'opacity-50 pointer-events-none' : ''}`}>
             <Upload className="w-4 h-4" />
             {isUploadingEtoll ? "Mengupload..." : "Import Excel"}
             <input ref={etollFileInputRef} type="file" accept=".xlsx,.xls" onChange={handleEtollFileUpload} className="hidden" />
           </label>
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl gradient-brand font-medium text-white hover:shadow-lg hover:shadow-brand-500/25 transition-all text-sm"
+            className="col-span-2 sm:col-span-1 flex items-center justify-center gap-2 px-4 py-2 sm:py-2.5 rounded-xl gradient-brand font-medium text-white hover:shadow-lg hover:shadow-brand-500/25 transition-all text-sm"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
             Tambah Kartu
           </button>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <button onClick={() => setFilterStatus("all")} className={cn("glass-card p-4 text-left transition-all", filterStatus === "all" && "ring-1 ring-brand-500/50")}>
-          <p className="text-xs text-surface-400 uppercase font-semibold">Total Kartu</p>
-          <p className="text-2xl font-bold text-white mt-1">{totalCards}</p>
+      {/* Stats Cards (2x2 di Mobile persis seperti screenshot) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+        <button onClick={() => setFilterStatus("all")} className={cn("glass-card p-3 sm:p-4 rounded-2xl text-left transition-all", filterStatus === "all" && "ring-1 ring-brand-500/50")}>
+          <p className="text-[10px] sm:text-xs text-surface-400 uppercase font-semibold">Total Kartu</p>
+          <p className="text-xl sm:text-2xl font-bold text-white mt-0.5">{totalCards}</p>
         </button>
-        <button onClick={() => setFilterStatus("in_use")} className={cn("glass-card p-4 border-l-2 border-l-amber-500 text-left transition-all", filterStatus === "in_use" && "ring-1 ring-amber-500/50")}>
-          <p className="text-xs text-surface-400 uppercase font-semibold">Sedang Dipakai</p>
-          <p className="text-2xl font-bold text-amber-400 mt-1">{inUseCount}</p>
+        <button onClick={() => setFilterStatus("in_use")} className={cn("glass-card p-3 sm:p-4 rounded-2xl border-l-2 border-l-amber-500 text-left transition-all", filterStatus === "in_use" && "ring-1 ring-amber-500/50")}>
+          <p className="text-[10px] sm:text-xs text-surface-400 uppercase font-semibold">Sedang Dipakai</p>
+          <p className="text-xl sm:text-2xl font-bold text-amber-400 mt-0.5">{inUseCount}</p>
         </button>
-        <button onClick={() => setFilterStatus("returned")} className={cn("glass-card p-4 border-l-2 border-l-emerald-500 text-left transition-all", filterStatus === "returned" && "ring-1 ring-emerald-500/50")}>
-          <p className="text-xs text-surface-400 uppercase font-semibold">Sudah Kembali</p>
-          <p className="text-2xl font-bold text-emerald-400 mt-1">{returnedCount}</p>
+        <button onClick={() => setFilterStatus("returned")} className={cn("glass-card p-3 sm:p-4 rounded-2xl border-l-2 border-l-emerald-500 text-left transition-all", filterStatus === "returned" && "ring-1 ring-emerald-500/50")}>
+          <p className="text-[10px] sm:text-xs text-surface-400 uppercase font-semibold">Sudah Kembali</p>
+          <p className="text-xl sm:text-2xl font-bold text-emerald-400 mt-0.5">{returnedCount}</p>
         </button>
-        <button onClick={() => setFilterStatus("lost")} className={cn("glass-card p-4 border-l-2 border-l-red-500 text-left transition-all", filterStatus === "lost" && "ring-1 ring-red-500/50")}>
-          <p className="text-xs text-surface-400 uppercase font-semibold">Hilang</p>
-          <p className="text-2xl font-bold text-red-400 mt-1">{lostCount}</p>
+        <button onClick={() => setFilterStatus("lost")} className={cn("glass-card p-3 sm:p-4 rounded-2xl border-l-2 border-l-red-500 text-left transition-all", filterStatus === "lost" && "ring-1 ring-red-500/50")}>
+          <p className="text-[10px] sm:text-xs text-surface-400 uppercase font-semibold">Hilang</p>
+          <p className="text-xl sm:text-2xl font-bold text-red-400 mt-0.5">{lostCount}</p>
         </button>
       </div>
 
       {/* Search */}
-      <div className="glass-card p-4">
+      <div className="glass-card p-3 sm:p-4 rounded-2xl">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-500" />
@@ -665,8 +665,8 @@ export default function EtollPage() {
               </button>
             )}
           </div>
-          <div className="flex gap-2">
-            <div className="relative min-w-[180px]">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1 sm:min-w-[180px]">
               <button
                 onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
                 className="w-full flex items-center justify-between pl-10 pr-4 py-2.5 bg-surface-900 border border-surface-700 text-white rounded-xl focus:outline-none focus:border-brand-500 hover:border-brand-500/50 hover:shadow-lg hover:shadow-brand-500/10 transition-all cursor-pointer"
