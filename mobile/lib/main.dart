@@ -163,16 +163,7 @@ class _SplashScreenState extends State<SplashScreen>
                           ),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Hotel & Transport Management',
-                        style: TextStyle(
-                          fontSize: 13,
-                          letterSpacing: 1.2,
-                          color: Colors.white.withValues(alpha: 0.6),
-                        ),
-                      ),
-                      const SizedBox(height: 48),
+                      const SizedBox(height: 40),
                       SizedBox(
                         width: 32,
                         height: 32,
