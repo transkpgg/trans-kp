@@ -153,19 +153,9 @@ export default function UserHomePage() {
       )}
 
       {/* Grid Kumpulan Menu Pintas Utama (Muat dalam 1 layar tanpa scroll) */}
-      <div className="glass-card p-4 sm:p-5 rounded-2xl border border-surface-800 shadow-lg space-y-3">
-        <div className="flex items-center justify-between pb-1 border-b border-surface-800/60">
-          <h3 className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-brand-500" />
-            Menu Layanan Operasional
-          </h3>
-          <span className="text-[10px] text-surface-400 font-medium">
-            {menuList.length} Menu
-          </span>
-        </div>
-
+      <div className="glass-card p-4 sm:p-5 rounded-2xl border border-surface-800 shadow-lg">
         {/* Grid Ikon Menu Pintas: 4 kolom rapi */}
-        <div className="grid grid-cols-4 gap-y-4 gap-x-2 pt-1.5">
+        <div className="grid grid-cols-4 gap-y-4 gap-x-2">
           {menuList.map((item) => {
             const Icon = item.icon;
             return (
