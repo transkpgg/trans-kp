@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Home, History, Building2, User, Receipt, LogOut } from "lucide-react";
 import { cn, getGreeting, getInitials } from "@/lib/utils";
 import useSWR from "swr";
+import { MobileBottomNav } from "@/components/ui/mobile-bottom-nav";
 
 const fetcher = (url: string) => fetch(url).then(res => res.json());
 
@@ -112,28 +113,7 @@ export default function DashboardLayout({
       </main>
 
       {/* Mobile Bottom Navigation (hidden on desktop) */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-surface-900/80 backdrop-blur-xl border-t border-surface-800/80 pb-safe">
-        <div className="flex items-center justify-around p-2 max-w-md mx-auto">
-          {navItems.map((item) => {
-            const isActive = pathname === item.href || (pathname.startsWith(item.href) && item.href !== "/home");
-            const Icon = item.icon;
-            
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={cn(
-                  "bottom-nav-item py-2 px-3 rounded-xl",
-                  isActive ? "active bg-brand-500/10" : ""
-                )}
-              >
-                <Icon className={cn("w-6 h-6 mb-1 transition-transform", isActive ? "scale-110 text-brand-500" : "text-surface-500")} />
-                <span className="text-[10px] font-medium leading-none">{item.name}</span>
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
+      <MobileBottomNav />
     </div>
   );
 }

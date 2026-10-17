@@ -23,6 +23,7 @@ import {
 import { cn, getInitials } from "@/lib/utils";
 import { mockCurrentAdmin } from "@/lib/mock-data";
 import { useRouter } from "next/navigation";
+import { MobileBottomNav } from "@/components/ui/mobile-bottom-nav";
 
 const adminNavItems = [
   { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
@@ -192,11 +193,13 @@ export default function AdminLayout({
         <div className="absolute top-0 right-0 w-[40%] h-[30%] bg-brand-500/5 rounded-full blur-[150px] pointer-events-none" />
 
         {/* Content */}
-        <div className="flex-1 p-4 lg:p-8 relative z-10 overflow-x-hidden">
+        <div className="flex-1 p-4 lg:p-8 relative z-10 overflow-x-hidden pb-20 lg:pb-8">
           {children}
         </div>
       </main>
 
+      {/* Mobile Bottom Navigation (Beranda, Dashboard, Akun) */}
+      <MobileBottomNav />
     </div>
   );
 }
