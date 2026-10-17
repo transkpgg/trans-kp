@@ -81,12 +81,7 @@ export default function LoginPage() {
           loginError.current = null;
           loginResult.current = null;
         } else if (loginResult.current) {
-          const data = loginResult.current;
-          if (data.user.role === "admin_cabang" || data.user.role === "super_admin") {
-            router.push("/admin/dashboard");
-          } else {
-            router.push("/home");
-          }
+          router.push("/home");
           loginResult.current = null;
         }
       }, 400);
@@ -148,11 +143,7 @@ export default function LoginPage() {
         if (meRes.ok) {
           const meData = await meRes.json();
           if (meData?.user && isMounted) {
-            if (meData.user.role === "admin_cabang" || meData.user.role === "super_admin") {
-              router.push("/admin/dashboard");
-            } else {
-              router.push("/home");
-            }
+            router.push("/home");
             return;
           }
         }

@@ -39,15 +39,11 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Mencegah user yang sudah login mengakses halaman login
+  // Mencegah user yang sudah login mengakses halaman login (langsung arahkan ke beranda utama)
   if (path === '/login' && token) {
     try {
-      const { payload } = await jose.jwtVerify(token, JWT_SECRET);
-      if (payload.role === 'admin_cabang' || payload.role === 'super_admin') {
-        return NextResponse.redirect(new URL('/admin/dashboard', request.url));
-      } else {
-        return NextResponse.redirect(new URL('/home', request.url));
-      }
+      await jose.jwtVerify(token, JWT_SECRET);
+      return NextResponse.redirect(new URL('/home', request.url));
     } catch (error) {
       // Biarkan lanjut ke login jika token tidak valid
     }

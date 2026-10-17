@@ -92,15 +92,14 @@ export default function DashboardLayout({
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-h-screen relative pb-20 md:pb-0 w-full max-w-full overflow-x-hidden">
         {/* Mobile Header (hidden on desktop) */}
-        <header className="md:hidden sticky top-0 z-40 bg-surface-950/80 backdrop-blur-xl border-b border-surface-800/50 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-surface-400">{getGreeting()},</p>
-              <p className="text-sm font-semibold text-white">{currentUser.full_name}</p>
-            </div>
-            <div className="w-10 h-10 rounded-full gradient-brand flex items-center justify-center text-sm font-medium text-white shadow-lg shadow-brand-500/20">
-              {getInitials(currentUser.full_name)}
-            </div>
+        <header className="md:hidden sticky top-0 z-40 bg-surface-950/90 backdrop-blur-xl border-b border-surface-800/60 px-4 py-2.5 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h1 className="text-base font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-brand-400 to-brand-600 tracking-wider">
+              TRANS KP
+            </h1>
+          </div>
+          <div className="w-8 h-8 rounded-full gradient-brand flex items-center justify-center text-xs font-bold text-white shadow-md shadow-brand-500/20">
+            {getInitials(currentUser.full_name)}
           </div>
         </header>
         
@@ -109,7 +108,7 @@ export default function DashboardLayout({
           <div className="absolute top-[-20%] right-0 w-[50%] h-[50%] bg-brand-500/10 rounded-full blur-[120px]" />
         </div>
 
-        <div className="flex-1 p-4 md:p-8 z-10 w-full max-w-full overflow-x-hidden relative">
+        <div className="flex-1 p-3.5 sm:p-5 z-10 w-full max-w-full overflow-x-hidden relative">
           {children}
         </div>
       </main>
