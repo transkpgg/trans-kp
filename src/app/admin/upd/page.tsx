@@ -327,20 +327,67 @@ export default function UpdCalculatorPage() {
 
   // Handler toggle overnight (bermalam)
   const handleToggleOvernight = (dateStr: string) => {
-    setCustomDaysConfig((prev) =>
-      prev.map((day) => {
-        if (day.dateStr === dateStr) {
+    setCustomDaysConfig((prev) => {
+      const dayIndex = prev.findIndex((d) => d.dateStr === dateStr);
+      if (dayIndex === -1) return prev;
+
+      const nextOvernightActive = !prev[dayIndex].overnight.active;
+
+      const depDate = new Date(departureDateTime);
+      const arrDate = new Date(returnDateTime);
+
+      return prev.map((day, idx) => {
+        // Hari yang di-toggle status inapnya
+        if (idx === dayIndex) {
+          const isFirstDay = idx === 0;
+          const isLastDay = idx === prev.length - 1;
+          const startHour = isFirstDay ? depDate.getHours() + depDate.getMinutes() / 60 : 0;
+          const endHour = isLastDay ? arrDate.getHours() + arrDate.getMinutes() / 60 : 24;
+
           return {
             ...day,
             overnight: {
               ...day.overnight,
-              active: !day.overnight.active,
+              active: nextOvernightActive,
             },
+            meals: day.meals.map((m) => {
+              if (m.key === "ekstra_21") {
+                // Jika inap diaktifkan, ekstra 21.00 hilang (false). Jika inap dinonaktifkan, pulihkan jika jam dinas mencakup 21.00
+                return {
+                  ...m,
+                  active: nextOvernightActive ? false : (startHour <= 21 && endHour >= 21),
+                };
+              }
+              return m;
+            }),
           };
         }
+
+        // Hari berikutnya setelah hari inap
+        if (idx === dayIndex + 1) {
+          const isFirstDay = idx === 0;
+          const isLastDay = idx === prev.length - 1;
+          const startHour = isFirstDay ? depDate.getHours() + depDate.getMinutes() / 60 : 0;
+          const endHour = isLastDay ? arrDate.getHours() + arrDate.getMinutes() / 60 : 24;
+
+          return {
+            ...day,
+            meals: day.meals.map((m) => {
+              if (m.key === "ekstra_03") {
+                // Jika hari kemarin inap diaktifkan, ekstra 03.00 keesokan harinya hilang (false). Jika inap dinonaktifkan, pulihkan jika jam dinas mencakup 03.00
+                return {
+                  ...m,
+                  active: nextOvernightActive ? false : (startHour <= 3 && endHour >= 3),
+                };
+              }
+              return m;
+            }),
+          };
+        }
+
         return day;
-      })
-    );
+      });
+    });
   };
 
   // Handler toggle cigarette (uang rokok)
@@ -1375,23 +1422,33 @@ export default function UpdCalculatorPage() {
 
                     {/* Compact Interactive Chips for Meals, Overnight, Cigarette */}
                     <div className="flex flex-wrap items-center gap-1.5 flex-1 justify-start md:justify-center">
-                      {day.meals.map((meal) => (
-                        <button
-                          key={meal.key}
-                          type="button"
-                          onClick={() => handleToggleMeal(day.dateStr, meal.key)}
-                          className={cn(
-                            "px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all flex items-center gap-1.5 border cursor-pointer select-none",
-                            meal.active
-                              ? "bg-brand-500/20 text-brand-300 border-brand-500/50 shadow-sm"
-                              : "bg-surface-900/40 text-surface-500 border-surface-800/80 line-through opacity-50 hover:opacity-80"
-                          )}
-                          title={`${meal.label} pukul ${meal.timeStr.replace(":", ".")} (${formatRupiah(meal.rate)})`}
-                        >
-                          <span className="font-mono text-[10px] opacity-75">{meal.timeStr.replace(":", ".")}</span>
-                          <span className="font-semibold">{formatRupiah(meal.rate)}</span>
-                        </button>
-                      ))}
+                      {day.meals.map((meal) => {
+                        const isOvernightDeactivated =
+                          (meal.key === "ekstra_21" && day.overnight.active) ||
+                          (meal.key === "ekstra_03" && idx > 0 && calculationResult.days[idx - 1]?.overnight?.active);
+
+                        return (
+                          <button
+                            key={meal.key}
+                            type="button"
+                            onClick={() => handleToggleMeal(day.dateStr, meal.key)}
+                            className={cn(
+                              "px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all flex items-center gap-1.5 border cursor-pointer select-none",
+                              meal.active
+                                ? "bg-brand-500/20 text-brand-300 border-brand-500/50 shadow-sm"
+                                : "bg-surface-900/40 text-surface-500 border-surface-800/80 line-through opacity-50 hover:opacity-80"
+                            )}
+                            title={
+                              isOvernightDeactivated && !meal.active
+                                ? `${meal.label} (${meal.timeStr.replace(":", ".")}) ditiadakan karena menginap/bermalam (klik untuk aktifkan manual jika ada lembur khusus)`
+                                : `${meal.label} pukul ${meal.timeStr.replace(":", ".")} (${formatRupiah(meal.rate)})`
+                            }
+                          >
+                            <span className="font-mono text-[10px] opacity-75">{meal.timeStr.replace(":", ".")}</span>
+                            <span className="font-semibold">{formatRupiah(meal.rate)}</span>
+                          </button>
+                        );
+                      })}
 
                       {/* Inap Chip */}
                       <button
@@ -1747,6 +1804,17 @@ export default function UpdCalculatorPage() {
                 <span className="font-semibold">Jatah Uang Rokok:</span>
               </div>
               <span className="font-bold text-amber-400 text-sm">Rp 4.050 / hari</span>
+            </div>
+
+            {/* Catatan Ketentuan Bermalam */}
+            <div className="p-3.5 rounded-xl bg-blue-500/10 border border-blue-500/30 text-xs text-blue-200 space-y-1">
+              <p className="font-bold flex items-center gap-1.5 text-blue-300">
+                <Moon className="w-3.5 h-3.5 text-amber-400" />
+                Ketentuan Upah Ekstra Saat Bermalam / Inap:
+              </p>
+              <p className="text-[11px] leading-relaxed text-surface-300">
+                Jika perjalanan dinas berstatus <strong>Bermalam / Inap</strong>, maka upah <strong>Ekstra Malam (21.00)</strong> pada hari menginap dan <strong>Ekstra Pagi (03.00)</strong> pada keesokan harinya <strong>otomatis ditiadakan</strong> karena pengemudi beristirahat di penginapan dan telah memperoleh uang bermalam (Rp 25.000 / Rp 50.000). Jika ada kebutuhan lembur khusus di luar jadwal inap, admin tetap dapat mengklik chip jam makan tersebut untuk mengaktifkannya secara manual.
+              </p>
             </div>
 
             <div className="flex justify-end">

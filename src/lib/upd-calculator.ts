@@ -164,13 +164,36 @@ export function calculateUpd(
     // Untuk tanggal merah tidak termasuk pengemudi penunjang, tapi untuk pengemudi organik
     const isHolidayForDriver = isHoliday && driverCategory === "organik";
 
+    // Evaluasi Bermalam (B) terlebih dahulu agar status inap hari ini diketahui untuk ekstra_21
+    const overnightRate = isHolidayForDriver ? OVERNIGHT_RATES.holiday : OVERNIGHT_RATES.workday;
+    // Otomatis aktif jika dinas berlanjut ke hari berikutnya (bukan hari terakhir)
+    const autoOvernight = !isLastDay;
+    let overnightActive = autoOvernight;
+    if (prevConfig?.overnight && typeof prevConfig.overnight.active === "boolean") {
+      overnightActive = prevConfig.overnight.active;
+    }
+
+    // Status menginap hari kemarin (apakah hari kemarin ada inap/bermalam aktif)
+    const prevDayOvernight = dayIdx > 0 ? Boolean(days[dayIdx - 1]?.overnight?.active) : false;
+
     // Evaluasi 5 slot makan
     const meals: DayMealItem[] = MEAL_SLOT_DEFS.map((slot) => {
       const slotHour = slot.hour + slot.minute / 60;
       const rate = isHolidayForDriver ? slot.holidayRate : slot.workdayRate;
 
       // Apakah secara otomatis tercakup dalam jam dinas
-      const autoActive = startHour <= slotHour && endHour >= slotHour;
+      let autoActive = startHour <= slotHour && endHour >= slotHour;
+
+      // Aturan Bermalam / Inap:
+      // 1. Ketika bermalam/inap pada hari ini, upah ekstra malam (21.00) otomatis hilang / dinonaktifkan
+      if (slot.key === "ekstra_21" && overnightActive) {
+        autoActive = false;
+      }
+
+      // 2. Ketika hari kemarin bermalam/inap, upah ekstra pagi (03.00) keesokan harinya otomatis hilang / dinonaktifkan
+      if (slot.key === "ekstra_03" && prevDayOvernight) {
+        autoActive = false;
+      }
 
       // Cek apakah user telah mengubah checklist manual
       let active = autoActive;
@@ -189,15 +212,6 @@ export function calculateUpd(
         active,
       };
     });
-
-    // Evaluasi Bermalam (B)
-    const overnightRate = isHolidayForDriver ? OVERNIGHT_RATES.holiday : OVERNIGHT_RATES.workday;
-    // Otomatis aktif jika dinas berlanjut ke hari berikutnya (bukan hari terakhir)
-    const autoOvernight = !isLastDay;
-    let overnightActive = autoOvernight;
-    if (prevConfig?.overnight && typeof prevConfig.overnight.active === "boolean") {
-      overnightActive = prevConfig.overnight.active;
-    }
 
     // Evaluasi Uang Rokok
     const cigRate = cigaretteRate;
