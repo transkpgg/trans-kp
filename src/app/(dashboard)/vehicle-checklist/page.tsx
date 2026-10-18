@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
@@ -42,7 +43,11 @@ const AC_OPTIONS = ["Dingin", "Kurang dingin", "Tidak dingin"];
 const BRAKE_FLUID_OPTIONS = ["Baik", "Kurang", "Kosong"];
 const FUEL_OPTIONS = ["E", "1/4", "1/2", "3/4", "F"];
 
-export default function TechnicianVehicleChecklistPage() {
+function TechnicianVehicleChecklistContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const tabParam = searchParams.get("tab");
+
   const { data: meData, isLoading: isMeLoading } = useSWR("/api/auth/me", fetcher);
   const currentUser = meData?.user;
 
@@ -62,9 +67,32 @@ export default function TechnicianVehicleChecklistPage() {
   const vehicles = Array.isArray(vehiclesData) ? vehiclesData : [];
   const drivers = Array.isArray(usersData) ? usersData.filter((u: any) => u.jabatan === "Driver" || u.role === "karyawan") : [];
 
-  const [activeTab, setActiveTab] = useState<"form" | "history">("form");
+  const [activeTab, setActiveTab] = useState<"form" | "history">(
+    tabParam === "history" || tabParam === "dashboard" ? "history" : "form"
+  );
   const [searchHistory, setSearchHistory] = useState("");
   const [selectedDetail, setSelectedDetail] = useState<any | null>(null);
+
+  useEffect(() => {
+    if (tabParam === "history" || tabParam === "dashboard") {
+      setActiveTab("history");
+    } else if (tabParam === "form") {
+      setActiveTab("form");
+    }
+  }, [tabParam]);
+
+  const handleTabChange = (t: "form" | "history") => {
+    setActiveTab(t);
+    router.replace(`/vehicle-checklist?tab=${t}`, { scroll: false });
+  };
+
+  const stats = useMemo(() => {
+    const total = checklists.length;
+    const laik = checklists.filter((c: any) => c.status === "Baik / Laik Jalan").length;
+    const perbaikan = total - laik;
+    const uniqueVehicles = new Set(checklists.map((c: any) => c.nopol)).size;
+    return { total, laik, perbaikan, uniqueVehicles };
+  }, [checklists]);
 
   // Form State
   const [nopol, setNopol] = useState("");
@@ -285,7 +313,7 @@ export default function TechnicianVehicleChecklistPage() {
         {/* Tab Controls */}
         <div className="flex items-center gap-2 bg-surface-900/80 p-1.5 rounded-2xl border border-surface-800 w-fit">
           <button
-            onClick={() => setActiveTab("form")}
+            onClick={() => handleTabChange("form")}
             className={cn(
               "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all",
               activeTab === "form"
@@ -294,10 +322,10 @@ export default function TechnicianVehicleChecklistPage() {
             )}
           >
             <Plus className="w-3.5 h-3.5" />
-            Formulir Baru
+            Formulir Ceklis
           </button>
           <button
-            onClick={() => setActiveTab("history")}
+            onClick={() => handleTabChange("history")}
             className={cn(
               "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all",
               activeTab === "history"
@@ -305,8 +333,8 @@ export default function TechnicianVehicleChecklistPage() {
                 : "text-surface-400 hover:text-white"
             )}
           >
-            <FileText className="w-3.5 h-3.5" />
-            Riwayat Ceklis ({checklists.length})
+            <ClipboardCheck className="w-3.5 h-3.5" />
+            Dashboard & Riwayat ({checklists.length})
           </button>
         </div>
       </div>
@@ -677,8 +705,44 @@ export default function TechnicianVehicleChecklistPage() {
           </div>
         </form>
       ) : (
-        /* History Tab */
+        /* History / Dashboard Tab */
         <div className="space-y-4">
+          {/* KPI Summary Dashboard Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="glass-card p-3.5 rounded-2xl border border-surface-800">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-surface-400">Total Ceklis</span>
+                <ClipboardCheck className="w-4 h-4 text-brand-400" />
+              </div>
+              <p className="text-xl font-bold text-white mt-1">{stats.total}</p>
+              <p className="text-[10px] text-surface-500 mt-0.5">Formulir tersimpan</p>
+            </div>
+            <div className="glass-card p-3.5 rounded-2xl border border-emerald-500/20 bg-emerald-500/5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-emerald-400">Laik Jalan</span>
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              </div>
+              <p className="text-xl font-bold text-white mt-1">{stats.laik}</p>
+              <p className="text-[10px] text-emerald-400/80 mt-0.5">Kondisi siap dinas</p>
+            </div>
+            <div className="glass-card p-3.5 rounded-2xl border border-amber-500/20 bg-amber-500/5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-amber-400">Perlu Perbaikan</span>
+                <AlertTriangle className="w-4 h-4 text-amber-400" />
+              </div>
+              <p className="text-xl font-bold text-white mt-1">{stats.perbaikan}</p>
+              <p className="text-[10px] text-amber-400/80 mt-0.5">Perlu perhatian mekanik</p>
+            </div>
+            <div className="glass-card p-3.5 rounded-2xl border border-surface-800">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-surface-400">Armada Unik</span>
+                <Car className="w-4 h-4 text-sky-400" />
+              </div>
+              <p className="text-xl font-bold text-white mt-1">{stats.uniqueVehicles}</p>
+              <p className="text-[10px] text-surface-500 mt-0.5">Kendaraan diperiksa</p>
+            </div>
+          </div>
+
           <div className="glass-card p-4 rounded-2xl border border-surface-800 flex flex-col sm:flex-row gap-3">
             <div className="flex-1 relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-surface-500" />
@@ -816,6 +880,14 @@ function CheckItemRow({
         })}
       </div>
     </div>
+  );
+}
+
+export default function TechnicianVehicleChecklistPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-surface-400">Memuat Ceklis Kendaraan...</div>}>
+      <TechnicianVehicleChecklistContent />
+    </Suspense>
   );
 }
 

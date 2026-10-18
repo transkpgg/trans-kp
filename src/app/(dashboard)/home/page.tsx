@@ -14,7 +14,9 @@ import {
   FileBarChart, 
   Clock,
   Wrench,
-  Car
+  Car,
+  ClipboardCheck,
+  User
 } from "lucide-react";
 import { formatTime, cn, getInitials } from "@/lib/utils";
 import useSWR from "swr";
@@ -121,7 +123,33 @@ export default function UserHomePage() {
     },
   ];
 
-  const menuList = (isMaintenanceAdmin && !isSuperAdmin) ? maintenanceAdminMenuList : baseMenuList;
+  // Khusus Teknisi: HANYA tampilkan Ceklis Kendaraan, Dashboard Ceklis, dan Profil
+  const teknisiMenuList = [
+    {
+      name: "Ceklis Kendaraan",
+      href: "/vehicle-checklist?tab=form",
+      icon: Wrench,
+      color: "border-sky-500/40 bg-gradient-to-br from-sky-500/20 to-blue-600/10 text-sky-400 shadow-sky-500/10",
+    },
+    {
+      name: "Dashboard Ceklis",
+      href: "/vehicle-checklist?tab=history",
+      icon: ClipboardCheck,
+      color: "border-emerald-500/40 bg-gradient-to-br from-emerald-500/20 to-teal-600/10 text-emerald-400 shadow-emerald-500/10",
+    },
+    {
+      name: "Profil Saya",
+      href: "/profile",
+      icon: User,
+      color: "border-purple-500/40 bg-gradient-to-br from-purple-500/20 to-violet-600/10 text-purple-400 shadow-purple-500/10",
+    },
+  ];
+
+  const menuList = (isMaintenanceAdmin && !isSuperAdmin) 
+    ? maintenanceAdminMenuList 
+    : (isTeknisi && !isSuperAdmin)
+      ? teknisiMenuList
+      : baseMenuList;
 
   return (
     <div className="space-y-4 w-full max-w-full overflow-hidden">

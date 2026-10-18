@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Home, History, Building2, User, Receipt, LogOut, Wrench, Car } from "lucide-react";
+import { Home, History, Building2, User, Receipt, LogOut, Wrench, Car, ClipboardCheck } from "lucide-react";
 import { cn, getGreeting, getInitials } from "@/lib/utils";
 import useSWR from "swr";
 import { MobileBottomNav } from "@/components/ui/mobile-bottom-nav";
@@ -28,11 +28,13 @@ export default function DashboardLayout({
     { name: "Perawatan Kendaraan", href: "/admin/vehicle-maintenance", icon: Wrench },
     { name: "Master Kendaraan", href: "/admin/vehicles", icon: Car },
     { name: "Profil", href: "/profile", icon: User },
+  ] : (isTeknisi && !isSuperAdmin) ? [
+    { name: "Home", href: "/home", icon: Home },
+    { name: "Ceklis Kendaraan", href: "/vehicle-checklist?tab=form", icon: Wrench },
+    { name: "Dashboard Ceklis", href: "/vehicle-checklist?tab=history", icon: ClipboardCheck },
+    { name: "Profil", href: "/profile", icon: User },
   ] : [
     { name: "Home", href: "/home", icon: Home },
-    ...(isTeknisi ? [
-      { name: "Ceklis Kendaraan", href: "/vehicle-checklist", icon: Wrench },
-    ] : []),
     ...((isSuperAdmin || isMaintenanceAdmin) ? [
       { name: "Perawatan Kendaraan", href: "/admin/vehicle-maintenance", icon: Wrench },
     ] : []),

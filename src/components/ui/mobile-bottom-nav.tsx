@@ -15,24 +15,27 @@ export function MobileBottomNav() {
 
   // Tentukan rute Dashboard sesuai role:
   const isMaintenanceAdmin = meData?.user?.jabatan === "Admin Perawatan Kendaraan";
+  const isTeknisi = meData?.user?.jabatan === "Teknisi";
   const dashboardHref = isMaintenanceAdmin 
     ? "/admin/vehicle-maintenance" 
-    : role === "karyawan" 
-      ? "/history" 
-      : "/admin/dashboard";
+    : isTeknisi
+      ? "/vehicle-checklist?tab=history"
+      : role === "karyawan" 
+        ? "/history" 
+        : "/admin/dashboard";
 
   const isBerandaActive =
     pathname === "/home" ||
     pathname.startsWith("/hotel-visit") ||
     pathname.startsWith("/bon-pengemudi") ||
-    pathname.startsWith("/vehicle-checklist") ||
     pathname === "/check-in" ||
     pathname === "/check-out" ||
     pathname === "/schedule";
 
   const isDashboardActive =
     pathname.startsWith("/admin") ||
-    pathname === "/history";
+    pathname === "/history" ||
+    (isTeknisi && pathname.startsWith("/vehicle-checklist"));
 
   const isAkunActive = pathname.startsWith("/profile");
 

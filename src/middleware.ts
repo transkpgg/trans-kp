@@ -37,6 +37,12 @@ export async function middleware(request: NextRequest) {
                                 path.startsWith('/admin/vehicle-maintenance') ||
                                 path.startsWith('/admin/vehicles');
 
+      // Jika teknisi mencoba akses menu pengemudi (hotel-visit / bon-pengemudi), arahkan ke menu ceklis
+      const isTeknisi = payload.jabatan === 'Teknisi';
+      if (isTeknisi && (path.startsWith('/hotel-visit') || path.startsWith('/bon-pengemudi'))) {
+        return NextResponse.redirect(new URL('/vehicle-checklist', request.url));
+      }
+
       if (path.startsWith('/admin') && !isExemptAdminPath && payload.role === 'karyawan') {
         return NextResponse.redirect(new URL('/home', request.url));
       }
