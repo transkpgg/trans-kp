@@ -30,6 +30,7 @@ model User {
   driver_bons  DriverBon[]
   fuel_trips   FuelTripLog[]
   upd_calculations UpdCalculation[]
+  vehicle_checklists VehicleChecklist[] @relation("TechnicianChecklists")
 }
 
 model Branch {
@@ -291,4 +292,73 @@ model UpdCalculation {
 
   driver              User?    @relation(fields: [driver_id], references: [id])
 }
+
+model VehicleChecklist {
+  id                    String   @id @default(cuid())
+  checklist_no          String?  @unique
+  date                  DateTime @default(now())
+  inspection_time       String   // e.g. "11:00"
+  nopol                 String
+  kilometer             Int      // Posisi Kilometer
+  fuel_level            String   // e.g. "E", "1/4", "1/2", "3/4", "F"
+  destination           String?  // e.g. "Pamekasan"
+  
+  // 1. Kondisi Mesin & Cairan
+  engine_oil            String   // "Cukup", "Kurang", "Kosong"
+  radiator_water        String   // "Cukup", "Kurang", "Kosong"
+  battery_water         String   // "Cukup", "Kurang", "Kosong"
+  power_steering_oil    String   // "Cukup", "Kurang", "Kosong"
+  v_belt                String   // "Baik", "Kurang Baik", "Rusak"
+  understell            String   // "Baik", "Kurang Baik", "Rusak"
+  dashboard_indicator   String   // "Baik", "Kurang Baik", "Rusak"
+  engine_condition      String   // "Baik", "Kurang Baik", "Rusak"
+
+  // 2. Kelengkapan
+  wheel_wrench          String   // "Ada", "Tidak Ada", "Rusak" (Kunci Roda)
+  jack                  String   // "Ada", "Tidak Ada", "Rusak" (Dongkrak)
+  safety_triangle       String   // "Ada", "Tidak Ada", "Rusak" (Segitiga Pengaman)
+  first_aid_box         String   // "Ada", "Tidak Ada", "Rusak" (Kotak P3K)
+  stnk_pkb              String   // "Ada", "Tidak Ada", "Rusak" (STNK + Pajak Kendaraan)
+
+  // 3. Ban Utama
+  main_tire_condition   String   // "Baik", "Kurang Baik", "Rusak"
+
+  // 4. Ban Serep
+  spare_tire_condition  String   // "Baik", "Kurang Baik", "Rusak"
+
+  // 5. Accesories
+  ac_condition          String   // "Dingin", "Kurang dingin", "Tidak dingin"
+  radio_tape            String   // "Baik", "Tidak Ada", "Rusak"
+  cigarette_lighter     String   // "Baik", "Tidak Ada", "Rusak"
+
+  // 6. Lampu-Lampu
+  lights_condition      String   // "Baik", "Tidak Ada", "Rusak"
+  lights_notes          String?  // Keterangan lampu
+
+  // 7. Rem
+  brake_operation       String   // "Baik", "Kurang Baik", "Rusak" (Kerja Rem)
+  brake_fluid           String   // "Baik", "Kurang", "Kosong" (Minyak Rem / Kopling)
+  hand_brake            String   // "Baik", "Kurang Baik", "Rusak" (Rem Tangan)
+
+  // Catatan umum & status kelayakan
+  general_notes         String?
+  status                String   @default("Baik / Laik Jalan") // "Baik / Laik Jalan", "Perlu Perbaikan"
+
+  // Tanda Tangan & Personil
+  driver_name           String?  // Nama Pengemudi (Yang membuat)
+  driver_signature      String?  // Base64 Data URL tanda tangan pengemudi
+  
+  technician_id         String?  // ID Teknisi yang membuat/memeriksa
+  technician_name       String   // Nama Teknisi / Perawatan (Menyetujui)
+  technician_signature  String?  // Base64 Data URL tanda tangan teknisi
+  
+  supervisor_name       String?  // Nama Pengawas (Mengetahui)
+  supervisor_signature  String?  // Base64 Data URL tanda tangan pengawas
+
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+
+  technician            User?    @relation("TechnicianChecklists", fields: [technician_id], references: [id])
+}
+
 

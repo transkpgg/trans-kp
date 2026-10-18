@@ -22,6 +22,7 @@ export function MobileBottomNav() {
     pathname === "/home" ||
     pathname.startsWith("/hotel-visit") ||
     pathname.startsWith("/bon-pengemudi") ||
+    pathname.startsWith("/vehicle-checklist") ||
     pathname === "/check-in" ||
     pathname === "/check-out" ||
     pathname === "/schedule";

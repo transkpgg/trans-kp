@@ -12,7 +12,8 @@ import {
   CreditCard, 
   Database, 
   FileBarChart, 
-  Clock
+  Clock,
+  Wrench
 } from "lucide-react";
 import { formatTime, cn, getInitials } from "@/lib/utils";
 import useSWR from "swr";
@@ -23,6 +24,9 @@ export default function UserHomePage() {
   const { data: meData } = useSWR("/api/auth/me", fetcher);
   const currentUser = meData?.user || { id: "", full_name: "Memuat...", jabatan: "Staf", nik: "-", role: "karyawan" };
   const isAdmin = currentUser.role === "admin_cabang" || currentUser.role === "super_admin";
+  const isTeknisi = currentUser.jabatan === "Teknisi";
+  const isMaintenanceAdmin = currentUser.jabatan === "Admin Perawatan Kendaraan";
+  const isSuperAdmin = currentUser.role === "super_admin";
 
   const [currentDate, setCurrentDate] = useState(new Date());
   
@@ -38,8 +42,24 @@ export default function UserHomePage() {
   const activeVisits = recentVisits.filter((v: any) => !v.check_out_time);
   const activeVisit = !isAdmin ? activeVisits[0] : null;
 
-  // Kumpulan 7 Menu Layanan Utama Beranda
-  const menuList = [
+  // Kumpulan Menu Layanan Utama Beranda
+  const baseMenuList = [
+    ...(isTeknisi ? [
+      {
+        name: "Ceklis Kendaraan",
+        href: "/vehicle-checklist",
+        icon: Wrench,
+        color: "border-sky-500/40 bg-gradient-to-br from-sky-500/20 to-blue-600/10 text-sky-400 shadow-sky-500/10",
+      }
+    ] : []),
+    ...((isSuperAdmin || isMaintenanceAdmin) ? [
+      {
+        name: "Perawatan Kendaraan",
+        href: "/admin/vehicle-maintenance",
+        icon: Wrench,
+        color: "border-orange-500/40 bg-gradient-to-br from-orange-500/20 to-amber-600/10 text-orange-400 shadow-orange-500/10",
+      }
+    ] : []),
     {
       name: "Kunjungan Hotel",
       href: isAdmin ? "/admin/hotel-visits" : "/hotel-visit",
@@ -83,6 +103,8 @@ export default function UserHomePage() {
       color: "border-teal-500/40 bg-gradient-to-br from-teal-500/20 to-emerald-600/10 text-teal-400 shadow-teal-500/10",
     },
   ];
+
+  const menuList = baseMenuList;
 
   return (
     <div className="space-y-4 w-full max-w-full overflow-hidden">

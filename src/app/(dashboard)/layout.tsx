@@ -2,19 +2,12 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Home, History, Building2, User, Receipt, LogOut } from "lucide-react";
+import { Home, History, Building2, User, Receipt, LogOut, Wrench } from "lucide-react";
 import { cn, getGreeting, getInitials } from "@/lib/utils";
 import useSWR from "swr";
 import { MobileBottomNav } from "@/components/ui/mobile-bottom-nav";
 
 const fetcher = (url: string) => fetch(url).then(res => res.json());
-
-const navItems = [
-  { name: "Home", href: "/home", icon: Home },
-  { name: "Hotel", href: "/hotel-visit", icon: Building2 },
-  { name: "Bon Pengemudi", href: "/bon-pengemudi", icon: Receipt },
-  { name: "Profil", href: "/profile", icon: User },
-];
 
 export default function DashboardLayout({
   children,
@@ -26,9 +19,18 @@ export default function DashboardLayout({
   const { data: meData } = useSWR("/api/auth/me", fetcher);
   const currentUser = meData?.user || { full_name: "Memuat...", jabatan: "...", role: "karyawan" };
   const isAdmin = currentUser.role === "admin_cabang" || currentUser.role === "super_admin";
+  const isTeknisi = currentUser.jabatan === "Teknisi";
+  const isMaintenanceAdmin = currentUser.jabatan === "Admin Perawatan Kendaraan";
+  const isSuperAdmin = currentUser.role === "super_admin";
 
   const navItems = [
     { name: "Home", href: "/home", icon: Home },
+    ...(isTeknisi ? [
+      { name: "Ceklis Kendaraan", href: "/vehicle-checklist", icon: Wrench },
+    ] : []),
+    ...((isSuperAdmin || isMaintenanceAdmin) ? [
+      { name: "Perawatan Kendaraan", href: "/admin/vehicle-maintenance", icon: Wrench },
+    ] : []),
     { name: "Hotel", href: isAdmin ? "/admin/hotel-visits" : "/hotel-visit", icon: Building2 },
     { name: "Bon Pengemudi", href: "/bon-pengemudi", icon: Receipt },
     { name: "Profil", href: "/profile", icon: User },

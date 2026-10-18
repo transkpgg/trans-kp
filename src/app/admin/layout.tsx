@@ -18,23 +18,13 @@ import {
   Bell,
   Database,
   Fuel,
-  Calculator
+  Calculator,
+  Wrench
 } from "lucide-react";
 import { cn, getInitials } from "@/lib/utils";
 import { mockCurrentAdmin } from "@/lib/mock-data";
 import { useRouter } from "next/navigation";
 import { MobileBottomNav } from "@/components/ui/mobile-bottom-nav";
-
-const adminNavItems = [
-  { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
-  { name: "Master Data", href: "/admin/master", icon: Database },
-  { name: "Monitoring BBM", href: "/admin/fuel-monitoring", icon: Fuel },
-  { name: "Kunjungan Hotel", href: "/admin/hotel-visits", icon: Building2 },
-  { name: "E-Toll", href: "/admin/etoll", icon: CreditCard },
-  { name: "Bon Pengemudi", href: "/admin/bon-pengemudi", icon: Receipt },
-  { name: "Hitung UPD", href: "/admin/upd", icon: Calculator },
-  { name: "Laporan", href: "/admin/reports", icon: FileBarChart },
-];
 
 export default function AdminLayout({
   children,
@@ -44,7 +34,26 @@ export default function AdminLayout({
   const pathname = usePathname();
   const router = useRouter();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const adminUser = mockCurrentAdmin;
+
+  const { data: meData } = useSWR("/api/auth/me", (url: string) => fetch(url).then(r => r.json()));
+  const adminUser = meData?.user || mockCurrentAdmin;
+  const isSuperAdmin = adminUser.role === "super_admin";
+  const isMaintenanceAdmin = adminUser.jabatan === "Admin Perawatan Kendaraan";
+
+  const adminNavItems = [
+    { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
+    { name: "Master Data", href: "/admin/master", icon: Database },
+    ...((isSuperAdmin || isMaintenanceAdmin) ? [
+      { name: "Perawatan Kendaraan", href: "/admin/vehicle-maintenance", icon: Wrench },
+    ] : []),
+    { name: "Monitoring BBM", href: "/admin/fuel-monitoring", icon: Fuel },
+    { name: "Kunjungan Hotel", href: "/admin/hotel-visits", icon: Building2 },
+    { name: "E-Toll", href: "/admin/etoll", icon: CreditCard },
+    { name: "Bon Pengemudi", href: "/admin/bon-pengemudi", icon: Receipt },
+    { name: "Hitung UPD", href: "/admin/upd", icon: Calculator },
+    { name: "Laporan", href: "/admin/reports", icon: FileBarChart },
+  ];
+
   const seenNotifications = useRef<Set<string>>(new Set());
 
   // Poll notifications every 10 seconds
