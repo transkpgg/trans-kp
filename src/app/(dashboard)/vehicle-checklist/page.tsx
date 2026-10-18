@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, Suspense } from "react";
+import { useState, useMemo, useEffect, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -25,7 +25,8 @@ import {
   ArrowLeft,
   ShieldCheck,
   Eye,
-  Check
+  Check,
+  ChevronDown
 } from "lucide-react";
 import useSWR from "swr";
 import { toast } from "sonner";
@@ -96,6 +97,29 @@ function TechnicianVehicleChecklistContent() {
 
   // Form State
   const [nopol, setNopol] = useState("");
+  const [isVehicleDropdownOpen, setIsVehicleDropdownOpen] = useState(false);
+  const vehicleDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (vehicleDropdownRef.current && !vehicleDropdownRef.current.contains(event.target as Node)) {
+        setIsVehicleDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredVehicles = useMemo(() => {
+    if (!nopol) return vehicles;
+    const q = nopol.toLowerCase();
+    return vehicles.filter(
+      (v: any) =>
+        v.nopol?.toLowerCase().includes(q) ||
+        (v.name || "").toLowerCase().includes(q) ||
+        (v.type || "").toLowerCase().includes(q)
+    );
+  }, [vehicles, nopol]);
   const [inspectionTime, setInspectionTime] = useState(() => {
     const d = new Date();
     return `${String(d.getHours()).padStart(2, '0')}.${String(d.getMinutes()).padStart(2, '0')}`;
@@ -350,25 +374,116 @@ function TechnicianVehicleChecklistContent() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Nomor Polisi */}
-              <div className="space-y-1.5">
+              <div className="space-y-1.5" ref={vehicleDropdownRef}>
                 <label className="text-xs font-semibold text-surface-300">
                   Nomor Polisi <span className="text-red-400">*</span>
                 </label>
                 <div className="relative">
                   <input
                     type="text"
-                    list="vehicle-list"
-                    placeholder="Contoh: AG 7244 BJ"
+                    placeholder="Pilih / ketik nopol..."
                     value={nopol}
-                    onChange={(e) => setNopol(e.target.value.toUpperCase())}
+                    onFocus={() => setIsVehicleDropdownOpen(true)}
+                    onChange={(e) => {
+                      setNopol(e.target.value.toUpperCase());
+                      setIsVehicleDropdownOpen(true);
+                    }}
                     required
-                    className="w-full bg-surface-900 border border-surface-700 text-white rounded-xl px-3 py-2 text-sm font-bold tracking-wider uppercase focus:outline-none focus:border-brand-500"
+                    className="w-full bg-surface-900 border border-surface-700 text-white rounded-xl pl-3 pr-16 py-2 text-sm font-bold font-mono tracking-wider uppercase focus:outline-none focus:border-brand-500 transition-colors"
                   />
-                  <datalist id="vehicle-list">
-                    {vehicles.map((v: any) => (
-                      <option key={v.id} value={v.nopol}>{v.name || v.type}</option>
-                    ))}
-                  </datalist>
+                  <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                    {nopol && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNopol("");
+                          setIsVehicleDropdownOpen(true);
+                        }}
+                        className="p-1 rounded-md text-surface-400 hover:text-white hover:bg-surface-800 transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setIsVehicleDropdownOpen(!isVehicleDropdownOpen)}
+                      className="p-1 rounded-md text-surface-400 hover:text-white transition-colors"
+                    >
+                      <ChevronDown className={cn("w-4 h-4 transition-transform duration-200", isVehicleDropdownOpen && "rotate-180")} />
+                    </button>
+                  </div>
+
+                  {/* Dropdown List Kendaraan Kebawah */}
+                  {isVehicleDropdownOpen && (
+                    <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-[#0F172A]/95 backdrop-blur-xl border border-surface-700/80 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                      <div className="p-2 border-b border-surface-800 text-[10px] font-bold text-surface-400 uppercase tracking-wider flex items-center justify-between">
+                        <span>Daftar Armada ({filteredVehicles.length})</span>
+                        {nopol && (
+                          <button
+                            type="button"
+                            onClick={() => setNopol("")}
+                            className="text-surface-400 hover:text-white"
+                          >
+                            Reset
+                          </button>
+                        )}
+                      </div>
+                      <div className="max-h-56 overflow-y-auto divide-y divide-surface-800/50 p-1 scrollbar-thin">
+                        {filteredVehicles.length === 0 ? (
+                          <div className="p-3 text-center text-xs text-surface-400">
+                            <p>Tidak ada armada dengan nopol tersebut.</p>
+                            <button
+                              type="button"
+                              onClick={() => setIsVehicleDropdownOpen(false)}
+                              className="mt-1.5 text-xs text-brand-400 font-semibold hover:underline"
+                            >
+                              Gunakan "{nopol}"
+                            </button>
+                          </div>
+                        ) : (
+                          filteredVehicles.map((v: any) => {
+                            const isSelected = nopol.toUpperCase() === v.nopol.toUpperCase();
+                            return (
+                              <button
+                                key={v.id}
+                                type="button"
+                                onClick={() => {
+                                  setNopol(v.nopol.toUpperCase());
+                                  setIsVehicleDropdownOpen(false);
+                                }}
+                                className={cn(
+                                  "w-full px-3 py-2 rounded-xl text-left flex items-center justify-between transition-all group",
+                                  isSelected
+                                    ? "bg-brand-500/15 border border-brand-500/30 text-white"
+                                    : "hover:bg-surface-800/80 text-surface-300 hover:text-white"
+                                )}
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div className={cn(
+                                    "p-1.5 rounded-lg shrink-0 transition-colors",
+                                    isSelected ? "bg-brand-500 text-white" : "bg-surface-800 group-hover:bg-surface-700 text-surface-400"
+                                  )}>
+                                    <Car className="w-4 h-4" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="font-mono font-bold text-xs sm:text-sm text-white tracking-wider">
+                                      {v.nopol}
+                                    </p>
+                                    <p className="text-[10px] text-surface-400 truncate">
+                                      {v.name || v.type || "Mobil"}
+                                    </p>
+                                  </div>
+                                </div>
+                                {isSelected && (
+                                  <Check className="w-4 h-4 text-brand-400 shrink-0 ml-2" />
+                                )}
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -763,67 +878,90 @@ function TechnicianVehicleChecklistContent() {
               <p className="text-xs text-surface-400 mt-1">Silakan isi formulir pemeriksaan baru di atas.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredHistory.map((item: any) => (
-                <div
-                  key={item.id}
-                  className="glass-card p-4 rounded-2xl border border-surface-800 hover:border-surface-700 transition-all space-y-3 flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-mono text-brand-400 font-bold bg-brand-500/10 px-2 py-0.5 rounded-md border border-brand-500/20">
-                        {item.checklist_no || "CHK"}
-                      </span>
-                      <span className={cn(
-                        "text-[10px] font-bold px-2 py-0.5 rounded-md",
-                        item.status === "Baik / Laik Jalan"
-                          ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-                          : "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+            <div className="flex flex-col space-y-3">
+              {filteredHistory.map((item: any) => {
+                const isBaik = item.status === "Baik / Laik Jalan";
+                return (
+                  <div
+                    key={item.id}
+                    className="glass-card p-4 sm:p-5 rounded-2xl border border-surface-800 hover:border-surface-700 bg-surface-900/60 hover:bg-surface-900/90 transition-all duration-200 hover:shadow-xl hover:shadow-black/20 flex flex-col md:flex-row md:items-center justify-between gap-4 group"
+                  >
+                    {/* Sisi Kiri: Info Utama Kendaraan */}
+                    <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+                      <div className={cn(
+                        "w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border transition-transform duration-200 group-hover:scale-105",
+                        isBaik
+                          ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                          : "bg-amber-500/10 border-amber-500/20 text-amber-400"
                       )}>
-                        {item.status}
-                      </span>
+                        <Car className="w-6 h-6" />
+                      </div>
+
+                      <div className="min-w-0 space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono font-bold text-base sm:text-lg text-white tracking-wider">
+                            {item.nopol}
+                          </span>
+                          <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md bg-brand-500/10 text-brand-400 border border-brand-500/20">
+                            {item.checklist_no || "CHK"}
+                          </span>
+                          <span className={cn(
+                            "text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1.5",
+                            isBaik
+                              ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                              : "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                          )}>
+                            <span className={cn("w-1.5 h-1.5 rounded-full", isBaik ? "bg-emerald-400" : "bg-amber-400")} />
+                            {item.status}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-x-4 gap-y-1 text-xs text-surface-400 flex-wrap">
+                          <span className="flex items-center gap-1">
+                            <MapPin className="w-3.5 h-3.5 text-brand-400 shrink-0" />
+                            <span className="text-surface-300 font-medium">{item.destination || "Dalam Kota"}</span>
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3.5 h-3.5 text-surface-500 shrink-0" />
+                            <span>{format(new Date(item.date), "dd MMM yyyy", { locale: id })} {item.inspection_time ? `• ${item.inspection_time}` : ""}</span>
+                          </span>
+                          {item.driver_name && (
+                            <span className="flex items-center gap-1">
+                              <span className="text-surface-500">Driver:</span>
+                              <span className="text-surface-300 font-medium">{item.driver_name}</span>
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1 text-surface-500">
+                            <span>Teknisi:</span>
+                            <span className="text-surface-400">{item.technician_name}</span>
+                          </span>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="mt-3 flex items-center justify-between">
-                      <div>
-                        <h3 className="text-base font-bold text-white tracking-wide">{item.nopol}</h3>
-                        <p className="text-xs text-surface-400">{item.destination ? `Tujuan: ${item.destination}` : "Dalam Kota"}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs font-mono font-bold text-emerald-400">{item.kilometer.toLocaleString()} KM</p>
-                        <p className="text-[10px] text-surface-500 font-mono">BBM: {item.fuel_level}</p>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 pt-2 border-t border-surface-800 text-[11px] text-surface-400 space-y-1">
-                      <p className="flex items-center justify-between">
-                        <span>Tanggal:</span>
-                        <span className="text-white font-medium">
-                          {format(new Date(item.date), "dd MMM yyyy", { locale: id })} {item.inspection_time && `(${item.inspection_time})`}
-                        </span>
-                      </p>
-                      <p className="flex items-center justify-between">
-                        <span>Teknisi:</span>
-                        <span className="text-surface-300 font-medium">{item.technician_name}</span>
-                      </p>
-                      {item.driver_name && (
-                        <p className="flex items-center justify-between">
-                          <span>Pengemudi:</span>
-                          <span className="text-surface-300 font-medium">{item.driver_name}</span>
+                    {/* Sisi Kanan: Odometer & Tombol Detail */}
+                    <div className="flex items-center justify-between md:justify-end gap-4 pt-3 md:pt-0 border-t md:border-t-0 border-surface-800/80 shrink-0">
+                      <div className="text-left md:text-right">
+                        <p className="text-sm sm:text-base font-mono font-bold text-emerald-400">
+                          {Number(item.kilometer).toLocaleString("id-ID")} KM
                         </p>
-                      )}
+                        <p className="text-[11px] text-surface-400 font-mono flex items-center md:justify-end gap-1">
+                          <Fuel className="w-3 h-3 text-amber-400" />
+                          BBM: <span className="text-white font-semibold">{item.fuel_level}</span>
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={() => setSelectedDetail(item)}
+                        className="px-4 py-2.5 rounded-xl bg-surface-800 hover:bg-brand-500/10 hover:border-brand-500/30 hover:text-brand-300 text-surface-200 text-xs font-semibold flex items-center gap-2 border border-surface-700 transition-all shadow-sm group-hover:border-surface-600"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-brand-400" />
+                        <span>Lembar Fisik</span>
+                      </button>
                     </div>
                   </div>
-
-                  <button
-                    onClick={() => setSelectedDetail(item)}
-                    className="w-full mt-2 py-2 px-3 rounded-xl bg-surface-800 hover:bg-surface-700 text-surface-200 text-xs font-semibold flex items-center justify-center gap-1.5 border border-surface-700 transition-colors"
-                  >
-                    <Eye className="w-3.5 h-3.5 text-brand-400" />
-                    Lihat Lembar Ceklis Fisik
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
