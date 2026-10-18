@@ -70,6 +70,7 @@ export default function AdminVehicleMaintenancePage() {
   // Export Modal & Android Download States
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState<"penumpang" | "lengkap">("penumpang");
+  const [exportScope, setExportScope] = useState<"filtered" | "all">("filtered");
   const [downloadSuccessModal, setDownloadSuccessModal] = useState<{
     open: boolean;
     fileName: string;
@@ -124,9 +125,14 @@ export default function AdminVehicleMaintenancePage() {
     });
   }, [checklists, search, statusFilter, dateRange]);
 
+  // Target data untuk ekspor berdasarkan scope pilihan user
+  const targetExportList = useMemo(() => {
+    return exportScope === "all" ? checklists : filteredChecklists;
+  }, [exportScope, checklists, filteredChecklists]);
+
   // Export ke Excel Sesuai Data Riil Yang Ada & Support Android Native Share/Open
   const executeExport = async (formatType: "penumpang" | "lengkap") => {
-    if (filteredChecklists.length === 0) {
+    if (targetExportList.length === 0) {
       toast.error("Tidak ada data ceklis untuk diekspor.");
       return;
     }
@@ -134,11 +140,19 @@ export default function AdminVehicleMaintenancePage() {
     const wb = XLSX.utils.book_new();
     let fileName = "";
 
+    // Urutkan semua data yang akan diekspor (tanggal terbaru dan jam terbaru)
+    const sortedAllItems = [...targetExportList].sort((a: any, b: any) => {
+      const dateA = a.date ? new Date(a.date).getTime() : 0;
+      const dateB = b.date ? new Date(b.date).getTime() : 0;
+      if (dateB !== dateA) return dateB - dateA;
+      return (b.inspection_time || "").localeCompare(a.inspection_time || "");
+    });
+
     if (formatType === "penumpang") {
       // 1. FORMAT RESMI: LAPORAN CHEK LIST KENDARAAN PENUMPANG (SESUAI CONTOH FOTO)
-      // Grouping data berdasarkan tanggal inspeksi (yyyy-MM-dd)
+      // Grouping data berdasarkan tanggal inspeksi
       const groupedByDate: Record<string, any[]> = {};
-      filteredChecklists.forEach((item: any) => {
+      sortedAllItems.forEach((item: any) => {
         const dStr = item.date ? format(new Date(item.date), "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd");
         if (!groupedByDate[dStr]) {
           groupedByDate[dStr] = [];
@@ -146,96 +160,185 @@ export default function AdminVehicleMaintenancePage() {
         groupedByDate[dStr].push(item);
       });
 
-      const dateKeys = Object.keys(groupedByDate).sort();
-      if (dateKeys.length === 0) {
-        toast.error("Tidak ada data tanggal yang valid untuk diekspor.");
-        return;
-      }
+      const dateKeys = Object.keys(groupedByDate).sort().reverse();
+      const hasMultipleDates = dateKeys.length > 1;
 
-      dateKeys.forEach((dateKey) => {
-        const items = groupedByDate[dateKey];
-        const dateObj = new Date(dateKey);
-        // Format nama tab: ddMMMyy (contoh: 15Okt26)
-        const sheetName = format(dateObj, "ddMMMyy", { locale: id });
-        // Format judul tanggal: TANGGAL [d MMMM yyyy] (contoh: TANGGAL 15 Oktober 2026)
-        const formattedDateTitle = format(dateObj, "d MMMM yyyy", { locale: id });
+      // SHEET UTAMA: WAJIB MENAMPILKAN SEMUA DATA SEKALIGUS (JIKA ADA 2 CEKLIS, KEDUANYA TAMPIL DI SINI)
+      const mainRows: any[][] = sortedAllItems.map((c: any, index: number) => {
+        const vMatch = vehicles.find((v: any) =>
+          v.nopol?.replace(/\s+/g, "").toUpperCase() === (c.nopol || "").replace(/\s+/g, "").toUpperCase()
+        );
+        const jenisKend = vMatch?.type || vMatch?.name || "Mini Bus";
 
-        // Urutkan data berdasarkan jam inspeksi / keberangkatan terbaru ke terlama
-        const sortedItems = [...items].sort((a: any, b: any) => {
-          const timeA = a.inspection_time || "";
-          const timeB = b.inspection_time || "";
-          return timeB.localeCompare(timeA);
-        });
+        let formattedKm = c.kilometer || "-";
+        const cleanKm = Number(String(c.kilometer).replace(/[^0-9]/g, ""));
+        if (!isNaN(cleanKm) && cleanKm > 0) {
+          formattedKm = cleanKm.toLocaleString("en-US");
+        }
 
-        // HANYA data riil yang ada (TANPA baris kosong / fake padding)
-        const rows: any[][] = sortedItems.map((c: any, index: number) => {
-          const vMatch = vehicles.find((v: any) =>
-            v.nopol?.replace(/\s+/g, "").toUpperCase() === (c.nopol || "").replace(/\s+/g, "").toUpperCase()
-          );
-          const jenisKend = vMatch?.type || vMatch?.name || "Mini Bus";
+        const formattedJam = (c.inspection_time || "-").replace(":", ".");
+        const formattedTgl = c.date ? format(new Date(c.date), "dd/MM/yyyy") : "-";
+        const tujuan = c.destination || "-";
+        const pengemudi = c.driver_name || c.technician_name || "-";
+        const keterangan = c.status === "Baik / Laik Jalan" ? "Siap" : (c.general_notes || c.status || "-");
 
-          // Format KM
-          let formattedKm = c.kilometer || "-";
-          const cleanKm = Number(String(c.kilometer).replace(/[^0-9]/g, ""));
-          if (!isNaN(cleanKm) && cleanKm > 0) {
-            formattedKm = cleanKm.toLocaleString("en-US");
-          }
-
-          // Format Jam (contoh: 16.00)
-          const formattedJam = (c.inspection_time || "-").replace(":", ".");
-          const tujuan = c.destination || "-";
-          const keterangan = c.status === "Baik / Laik Jalan" ? "Siap" : (c.general_notes || c.status || "-");
-
+        if (hasMultipleDates) {
+          return [
+            index + 1,
+            c.nopol || "-",
+            jenisKend,
+            formattedTgl,
+            formattedJam,
+            formattedKm,
+            pengemudi,
+            tujuan,
+            keterangan,
+          ];
+        } else {
           return [
             index + 1,
             c.nopol || "-",
             jenisKend,
             formattedKm,
             formattedJam,
-            c.driver_name || "-",
+            pengemudi,
             tujuan,
             keterangan,
           ];
-        });
-
-        // Struktur sheet lengkap:
-        const sheetData: any[][] = [
-          [],
-          [],
-          ["LAPORAN CHEK LIST KENDARAAN PENUMPANG"],
-          [`TANGGAL ${formattedDateTitle}`],
-          [],
-          ["No Urut", "No Pol", "Jenis Kend.", "KM", "Jam", "Pengemudi", "Tujuan", "Keterangan"],
-          ...rows,
-        ];
-
-        const ws = XLSX.utils.aoa_to_sheet(sheetData);
-
-        // Penggabungan cell judul
-        ws["!merges"] = [
-          { s: { r: 2, c: 0 }, e: { r: 2, c: 7 } }, // A3:H3 (Judul)
-          { s: { r: 3, c: 0 }, e: { r: 3, c: 7 } }, // A4:H4 (Tanggal)
-        ];
-
-        // Lebar kolom
-        ws["!cols"] = [
-          { wch: 8 },  // No Urut
-          { wch: 15 }, // No Pol
-          { wch: 15 }, // Jenis Kend.
-          { wch: 14 }, // KM
-          { wch: 10 }, // Jam
-          { wch: 26 }, // Pengemudi
-          { wch: 18 }, // Tujuan
-          { wch: 16 }, // Keterangan
-        ];
-
-        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+        }
       });
+
+      let mainSubtitle = "";
+      if (dateKeys.length === 1) {
+        mainSubtitle = `TANGGAL ${format(new Date(dateKeys[0]), "d MMMM yyyy", { locale: id })}`;
+      } else if (dateKeys.length > 1) {
+        const newest = format(new Date(dateKeys[0]), "d MMM yyyy", { locale: id });
+        const oldest = format(new Date(dateKeys[dateKeys.length - 1]), "d MMM yyyy", { locale: id });
+        mainSubtitle = `PERIODE: ${oldest} s/d ${newest}`;
+      } else {
+        mainSubtitle = `TANGGAL ${format(new Date(), "d MMMM yyyy", { locale: id })}`;
+      }
+
+      const mainHeader = hasMultipleDates
+        ? ["No Urut", "No Pol", "Jenis Kend.", "Tanggal", "Jam", "KM", "Pengemudi", "Tujuan", "Keterangan"]
+        : ["No Urut", "No Pol", "Jenis Kend.", "KM", "Jam", "Pengemudi", "Tujuan", "Keterangan"];
+
+      const mainSheetData: any[][] = [
+        [],
+        [],
+        ["LAPORAN CHEK LIST KENDARAAN PENUMPANG"],
+        [mainSubtitle],
+        [],
+        mainHeader,
+        ...mainRows,
+      ];
+
+      const wsMain = XLSX.utils.aoa_to_sheet(mainSheetData);
+      const maxColIdx = mainHeader.length - 1;
+      wsMain["!merges"] = [
+        { s: { r: 2, c: 0 }, e: { r: 2, c: maxColIdx } },
+        { s: { r: 3, c: 0 }, e: { r: 3, c: maxColIdx } },
+      ];
+
+      if (hasMultipleDates) {
+        wsMain["!cols"] = [
+          { wch: 8 },
+          { wch: 15 },
+          { wch: 14 },
+          { wch: 13 },
+          { wch: 10 },
+          { wch: 14 },
+          { wch: 24 },
+          { wch: 18 },
+          { wch: 15 },
+        ];
+      } else {
+        wsMain["!cols"] = [
+          { wch: 8 },
+          { wch: 15 },
+          { wch: 14 },
+          { wch: 14 },
+          { wch: 10 },
+          { wch: 24 },
+          { wch: 18 },
+          { wch: 15 },
+        ];
+      }
+
+      const mainSheetName = hasMultipleDates ? "Semua Ceklis" : format(new Date(dateKeys[0]), "ddMMMyy", { locale: id });
+      XLSX.utils.book_append_sheet(wb, wsMain, mainSheetName);
+
+      // JIKA LEBIH DARI 1 TANGGAL: Tambahkan juga tab per tanggal untuk kemudahan arsip harian
+      if (hasMultipleDates) {
+        dateKeys.forEach((dateKey) => {
+          const items = groupedByDate[dateKey];
+          const dateObj = new Date(dateKey);
+          const tabName = format(dateObj, "ddMMMyy", { locale: id });
+          const singleDateTitle = format(dateObj, "d MMMM yyyy", { locale: id });
+
+          const dailyRows: any[][] = items.map((c: any, idx: number) => {
+            const vMatch = vehicles.find((v: any) =>
+              v.nopol?.replace(/\s+/g, "").toUpperCase() === (c.nopol || "").replace(/\s+/g, "").toUpperCase()
+            );
+            const jenisKend = vMatch?.type || vMatch?.name || "Mini Bus";
+
+            let formattedKm = c.kilometer || "-";
+            const cleanKm = Number(String(c.kilometer).replace(/[^0-9]/g, ""));
+            if (!isNaN(cleanKm) && cleanKm > 0) {
+              formattedKm = cleanKm.toLocaleString("en-US");
+            }
+
+            const formattedJam = (c.inspection_time || "-").replace(":", ".");
+            const tujuan = c.destination || "-";
+            const pengemudi = c.driver_name || c.technician_name || "-";
+            const keterangan = c.status === "Baik / Laik Jalan" ? "Siap" : (c.general_notes || c.status || "-");
+
+            return [
+              idx + 1,
+              c.nopol || "-",
+              jenisKend,
+              formattedKm,
+              formattedJam,
+              pengemudi,
+              tujuan,
+              keterangan,
+            ];
+          });
+
+          const dailySheetData: any[][] = [
+            [],
+            [],
+            ["LAPORAN CHEK LIST KENDARAAN PENUMPANG"],
+            [`TANGGAL ${singleDateTitle}`],
+            [],
+            ["No Urut", "No Pol", "Jenis Kend.", "KM", "Jam", "Pengemudi", "Tujuan", "Keterangan"],
+            ...dailyRows,
+          ];
+
+          const wsDaily = XLSX.utils.aoa_to_sheet(dailySheetData);
+          wsDaily["!merges"] = [
+            { s: { r: 2, c: 0 }, e: { r: 2, c: 7 } },
+            { s: { r: 3, c: 0 }, e: { r: 3, c: 7 } },
+          ];
+          wsDaily["!cols"] = [
+            { wch: 8 },
+            { wch: 15 },
+            { wch: 14 },
+            { wch: 14 },
+            { wch: 10 },
+            { wch: 24 },
+            { wch: 18 },
+            { wch: 15 },
+          ];
+
+          XLSX.utils.book_append_sheet(wb, wsDaily, tabName);
+        });
+      }
 
       fileName = `Laporan_Chek_List_Kendaraan_Penumpang_${format(new Date(), "yyyyMMdd_HHmm")}.xlsx`;
     } else {
       // 2. FORMAT LENGKAP: SEMUA KOLOM SESUAI FORM CEKLIS LENGKAP
-      const exportData = filteredChecklists.map((c: any, index: number) => {
+      const exportData = sortedAllItems.map((c: any, index: number) => {
         const vMatch = vehicles.find((v: any) =>
           v.nopol?.replace(/\s+/g, "").toUpperCase() === (c.nopol || "").replace(/\s+/g, "").toUpperCase()
         );
@@ -325,10 +428,10 @@ export default function AdminVehicleMaintenancePage() {
       open: true,
       fileName,
       blob,
-      totalRows: filteredChecklists.length,
+      totalRows: targetExportList.length,
     });
 
-    toast.success(`Berhasil mengekspor ${filteredChecklists.length} data riil!`);
+    toast.success(`Berhasil mengekspor ${targetExportList.length} data riil!`);
   };
 
   const handleShareFileAgain = async () => {
@@ -1038,9 +1141,56 @@ export default function AdminVehicleMaintenancePage() {
               </div>
             </div>
 
-            <div className="p-3 rounded-xl bg-surface-900/80 border border-surface-800 text-xs text-surface-400 flex items-center justify-between">
-              <span>Data yang akan diekspor:</span>
-              <span className="font-bold text-white">{filteredChecklists.length} data riil (sesuai filter)</span>
+            {/* Pilihan Cakupan Data */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-surface-300">Cakupan Data yang Diekspor:</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setExportScope("filtered")}
+                  className={cn(
+                    "p-2.5 rounded-xl border text-left transition-all",
+                    exportScope === "filtered"
+                      ? "bg-brand-500/15 border-brand-500 text-white font-bold"
+                      : "bg-surface-900/60 border-surface-800 text-surface-400 hover:text-white"
+                  )}
+                >
+                  <p className="text-xs">Sesuai Filter ({filteredChecklists.length} Ceklis)</p>
+                  <p className="text-[10px] text-surface-500 font-normal">Sesuai pencarian & tanggal</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExportScope("all")}
+                  className={cn(
+                    "p-2.5 rounded-xl border text-left transition-all",
+                    exportScope === "all"
+                      ? "bg-brand-500/15 border-brand-500 text-white font-bold"
+                      : "bg-surface-900/60 border-surface-800 text-surface-400 hover:text-white"
+                  )}
+                >
+                  <p className="text-xs">Semua Riwayat ({checklists.length} Ceklis)</p>
+                  <p className="text-[10px] text-surface-500 font-normal">Seluruh data tanpa filter</p>
+                </button>
+              </div>
+            </div>
+
+            {/* Preview Ringkasan Data yang Akan Diekspor */}
+            <div className="p-3 rounded-xl bg-surface-900/80 border border-surface-800 space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-surface-400">Total data yang akan diekspor:</span>
+                <span className="font-bold text-emerald-400 text-sm">
+                  {targetExportList.length} Ceklis Riil
+                </span>
+              </div>
+              <div className="max-h-24 overflow-y-auto divide-y divide-surface-800/40 p-1 scrollbar-thin">
+                {targetExportList.map((item: any) => (
+                  <div key={item.id} className="flex items-center justify-between text-[11px] text-surface-300 py-1">
+                    <span className="font-mono font-bold text-white">{item.nopol}</span>
+                    <span className="text-surface-400">{item.date ? format(new Date(item.date), "dd MMM yyyy") : "-"}</span>
+                    <span className="text-surface-400 truncate max-w-[130px]">{item.driver_name || item.technician_name || "-"}</span>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="flex justify-end gap-3 pt-2">
