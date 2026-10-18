@@ -24,7 +24,10 @@ import {
   ArrowLeft,
   Clock,
   Gauge,
-  MapPin
+  MapPin,
+  Share2,
+  FolderDown,
+  ExternalLink
 } from "lucide-react";
 import useSWR from "swr";
 import { toast } from "sonner";
@@ -63,6 +66,21 @@ export default function AdminVehicleMaintenancePage() {
   // Import Excel State
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+
+  // Export Modal & Android Download States
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState<"penumpang" | "lengkap">("penumpang");
+  const [downloadSuccessModal, setDownloadSuccessModal] = useState<{
+    open: boolean;
+    fileName: string;
+    blob: Blob | null;
+    totalRows: number;
+  }>({
+    open: false,
+    fileName: "",
+    blob: null,
+    totalRows: 0,
+  });
 
   // Summary Metrics
   const totalChecklists = checklists.length;
@@ -106,150 +124,238 @@ export default function AdminVehicleMaintenancePage() {
     });
   }, [checklists, search, statusFilter, dateRange]);
 
-  // Export ke Excel Sesuai Format "LAPORAN CHEK LIST KENDARAAN PENUMPANG"
-  const handleExportExcel = () => {
+  // Export ke Excel Sesuai Data Riil Yang Ada & Support Android Native Share/Open
+  const executeExport = async (formatType: "penumpang" | "lengkap") => {
     if (filteredChecklists.length === 0) {
       toast.error("Tidak ada data ceklis untuk diekspor.");
       return;
     }
 
-    // Grouping data berdasarkan tanggal inspeksi (yyyy-MM-dd)
-    const groupedByDate: Record<string, any[]> = {};
-    filteredChecklists.forEach((item: any) => {
-      const dStr = item.date ? format(new Date(item.date), "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd");
-      if (!groupedByDate[dStr]) {
-        groupedByDate[dStr] = [];
-      }
-      groupedByDate[dStr].push(item);
-    });
-
-    const dateKeys = Object.keys(groupedByDate).sort();
-    if (dateKeys.length === 0) {
-      toast.error("Tidak ada data tanggal yang valid untuk diekspor.");
-      return;
-    }
-
     const wb = XLSX.utils.book_new();
+    let fileName = "";
 
-    dateKeys.forEach((dateKey) => {
-      const items = groupedByDate[dateKey];
-      const dateObj = new Date(dateKey);
-      // Format nama tab: ddMMMyy (contoh: 15Okt26)
-      const sheetName = format(dateObj, "ddMMMyy", { locale: id });
-      // Format judul tanggal: TANGGAL [d MMMM yyyy] (contoh: TANGGAL 15 Oktober 2026)
-      const formattedDateTitle = format(dateObj, "d MMMM yyyy", { locale: id });
-
-      // Urutkan data berdasarkan jam inspeksi / keberangkatan (terbaru ke terlama)
-      const sortedItems = [...items].sort((a: any, b: any) => {
-        const timeA = a.inspection_time || "";
-        const timeB = b.inspection_time || "";
-        return timeB.localeCompare(timeA);
+    if (formatType === "penumpang") {
+      // 1. FORMAT RESMI: LAPORAN CHEK LIST KENDARAAN PENUMPANG (SESUAI CONTOH FOTO)
+      // Grouping data berdasarkan tanggal inspeksi (yyyy-MM-dd)
+      const groupedByDate: Record<string, any[]> = {};
+      filteredChecklists.forEach((item: any) => {
+        const dStr = item.date ? format(new Date(item.date), "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd");
+        if (!groupedByDate[dStr]) {
+          groupedByDate[dStr] = [];
+        }
+        groupedByDate[dStr].push(item);
       });
 
-      // Baris data terisi
-      const rows: any[][] = sortedItems.map((c: any, index: number) => {
-        // Cari jenis kendaraan dari master
+      const dateKeys = Object.keys(groupedByDate).sort();
+      if (dateKeys.length === 0) {
+        toast.error("Tidak ada data tanggal yang valid untuk diekspor.");
+        return;
+      }
+
+      dateKeys.forEach((dateKey) => {
+        const items = groupedByDate[dateKey];
+        const dateObj = new Date(dateKey);
+        // Format nama tab: ddMMMyy (contoh: 15Okt26)
+        const sheetName = format(dateObj, "ddMMMyy", { locale: id });
+        // Format judul tanggal: TANGGAL [d MMMM yyyy] (contoh: TANGGAL 15 Oktober 2026)
+        const formattedDateTitle = format(dateObj, "d MMMM yyyy", { locale: id });
+
+        // Urutkan data berdasarkan jam inspeksi / keberangkatan terbaru ke terlama
+        const sortedItems = [...items].sort((a: any, b: any) => {
+          const timeA = a.inspection_time || "";
+          const timeB = b.inspection_time || "";
+          return timeB.localeCompare(timeA);
+        });
+
+        // HANYA data riil yang ada (TANPA baris kosong / fake padding)
+        const rows: any[][] = sortedItems.map((c: any, index: number) => {
+          const vMatch = vehicles.find((v: any) =>
+            v.nopol?.replace(/\s+/g, "").toUpperCase() === (c.nopol || "").replace(/\s+/g, "").toUpperCase()
+          );
+          const jenisKend = vMatch?.type || vMatch?.name || "Mini Bus";
+
+          // Format KM
+          let formattedKm = c.kilometer || "-";
+          const cleanKm = Number(String(c.kilometer).replace(/[^0-9]/g, ""));
+          if (!isNaN(cleanKm) && cleanKm > 0) {
+            formattedKm = cleanKm.toLocaleString("en-US");
+          }
+
+          // Format Jam (contoh: 16.00)
+          const formattedJam = (c.inspection_time || "-").replace(":", ".");
+          const tujuan = c.destination || "-";
+          const keterangan = c.status === "Baik / Laik Jalan" ? "Siap" : (c.general_notes || c.status || "-");
+
+          return [
+            index + 1,
+            c.nopol || "-",
+            jenisKend,
+            formattedKm,
+            formattedJam,
+            c.driver_name || "-",
+            tujuan,
+            keterangan,
+          ];
+        });
+
+        // Struktur sheet lengkap:
+        const sheetData: any[][] = [
+          [],
+          [],
+          ["LAPORAN CHEK LIST KENDARAAN PENUMPANG"],
+          [`TANGGAL ${formattedDateTitle}`],
+          [],
+          ["No Urut", "No Pol", "Jenis Kend.", "KM", "Jam", "Pengemudi", "Tujuan", "Keterangan"],
+          ...rows,
+        ];
+
+        const ws = XLSX.utils.aoa_to_sheet(sheetData);
+
+        // Penggabungan cell judul
+        ws["!merges"] = [
+          { s: { r: 2, c: 0 }, e: { r: 2, c: 7 } }, // A3:H3 (Judul)
+          { s: { r: 3, c: 0 }, e: { r: 3, c: 7 } }, // A4:H4 (Tanggal)
+        ];
+
+        // Lebar kolom
+        ws["!cols"] = [
+          { wch: 8 },  // No Urut
+          { wch: 15 }, // No Pol
+          { wch: 15 }, // Jenis Kend.
+          { wch: 14 }, // KM
+          { wch: 10 }, // Jam
+          { wch: 26 }, // Pengemudi
+          { wch: 18 }, // Tujuan
+          { wch: 16 }, // Keterangan
+        ];
+
+        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+      });
+
+      fileName = `Laporan_Chek_List_Kendaraan_Penumpang_${format(new Date(), "yyyyMMdd_HHmm")}.xlsx`;
+    } else {
+      // 2. FORMAT LENGKAP: SEMUA KOLOM SESUAI FORM CEKLIS LENGKAP
+      const exportData = filteredChecklists.map((c: any, index: number) => {
         const vMatch = vehicles.find((v: any) =>
           v.nopol?.replace(/\s+/g, "").toUpperCase() === (c.nopol || "").replace(/\s+/g, "").toUpperCase()
         );
-        const jenisKend = vMatch?.type || vMatch?.name || "Mini Bus";
-
-        // Format KM (contoh: 310,118)
-        let formattedKm = c.kilometer || "-";
-        const cleanKm = Number(String(c.kilometer).replace(/[^0-9]/g, ""));
-        if (!isNaN(cleanKm) && cleanKm > 0) {
-          formattedKm = cleanKm.toLocaleString("en-US");
-        }
-
-        // Format Jam (contoh: 16.00)
-        const formattedJam = (c.inspection_time || "-").replace(":", ".");
-        const tujuan = c.destination || "Stanby";
-        const keterangan = c.status === "Baik / Laik Jalan" ? "Siap" : (c.general_notes || "Perlu Perbaikan");
-
-        return [
-          index + 1,
-          c.nopol || "-",
-          jenisKend,
-          formattedKm,
-          formattedJam,
-          c.driver_name || "-",
-          tujuan,
-          keterangan,
-        ];
+        return {
+          "No": index + 1,
+          "No Ceklis": c.checklist_no || "-",
+          "Tanggal": format(new Date(c.date), "dd/MM/yyyy"),
+          "Jam": c.inspection_time || "-",
+          "Nomor Polisi": c.nopol,
+          "Jenis Kendaraan": vMatch?.type || vMatch?.name || "Mobil",
+          "Kilometer (KM)": c.kilometer,
+          "Indikator BBM": c.fuel_level,
+          "Tujuan Keberangkatan": c.destination || "-",
+          "Status Kelayakan": c.status,
+          "Nama Pengemudi": c.driver_name || "-",
+          "Teknisi Pemeriksa": c.technician_name || "-",
+          "Pengawas": c.supervisor_name || "-",
+          "Oli Mesin": c.engine_oil,
+          "Air Radiator": c.radiator_water,
+          "Accu / Air Accu": c.battery_water,
+          "Oli Powersteer": c.power_steering_oil,
+          "V. Belt": c.v_belt,
+          "Understell": c.understell,
+          "Indikator Dashboard": c.dashboard_indicator,
+          "Kondisi Mesin": c.engine_condition,
+          "Kunci Roda": c.wheel_wrench,
+          "Dongkrak": c.jack,
+          "Segitiga Pengaman": c.safety_triangle,
+          "Kotak P3K": c.first_aid_box,
+          "STNK / PKB": c.stnk_pkb,
+          "Ban Utama": c.main_tire_condition,
+          "Ban Serep": c.spare_tire_condition,
+          "Kondisi AC": c.ac_condition,
+          "Radio / Tape": c.radio_tape,
+          "Pemantik Rokok": c.cigarette_lighter,
+          "Lampu-Lampu": c.lights_condition,
+          "Catatan Lampu": c.lights_notes || "-",
+          "Kerja Rem": c.brake_operation,
+          "Minyak Rem": c.brake_fluid,
+          "Rem Tangan": c.hand_brake,
+          "Catatan Umum": c.general_notes || "-",
+        };
       });
 
-      // Lengkapi baris template minimal 15 baris sesuai format fisik
-      const minRows = 15;
-      for (let r = rows.length + 1; r <= minRows; r++) {
-        rows.push([r, "", "", "", "", "", "", "Siap"]);
-      }
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      XLSX.utils.book_append_sheet(wb, ws, "Rekap Data Ceklis Lengkap");
+      fileName = `Rekap_Lengkap_Ceklis_Kendaraan_${format(new Date(), "yyyyMMdd_HHmm")}.xlsx`;
+    }
 
-      // Struktur sheet lengkap:
-      // Baris 1: Kosong
-      // Baris 2: Kosong
-      // Baris 3: Judul (LAPORAN CHEK LIST KENDARAAN PENUMPANG)
-      // Baris 4: Tanggal otomatis (TANGGAL 15 Oktober 2026)
-      // Baris 5: Kosong
-      // Baris 6: Header Kolom
-      // Baris 7: Header Kolom Baris 2 (untuk merge)
-      // Baris 8+: Data
-      const sheetData: any[][] = [
-        [],
-        [],
-        ["LAPORAN CHEK LIST KENDARAAN PENUMPANG"],
-        [`TANGGAL ${formattedDateTitle}`],
-        [],
-        ["No Urut", "No Pol", "Jenis Kend.", "KM", "Jam", "Pengemudi", "Tujuan", "Keterangan"],
-        ["", "", "", "", "", "", "", ""],
-        ...rows,
-      ];
-
-      const ws = XLSX.utils.aoa_to_sheet(sheetData);
-
-      // Penggabungan cell (Merges)
-      ws["!merges"] = [
-        { s: { r: 2, c: 0 }, e: { r: 2, c: 7 } }, // A3:H3 (Judul)
-        { s: { r: 3, c: 0 }, e: { r: 3, c: 7 } }, // A4:H4 (Tanggal)
-        { s: { r: 5, c: 0 }, e: { r: 6, c: 0 } }, // A6:A7 (No Urut)
-        { s: { r: 5, c: 1 }, e: { r: 6, c: 1 } }, // B6:B7 (No Pol)
-        { s: { r: 5, c: 2 }, e: { r: 6, c: 2 } }, // C6:C7 (Jenis Kend.)
-        { s: { r: 5, c: 3 }, e: { r: 6, c: 3 } }, // D6:D7 (KM)
-        { s: { r: 5, c: 4 }, e: { r: 6, c: 4 } }, // E6:E7 (Jam)
-        { s: { r: 5, c: 5 }, e: { r: 6, c: 5 } }, // F6:F7 (Pengemudi)
-        { s: { r: 5, c: 6 }, e: { r: 6, c: 6 } }, // G6:G7 (Tujuan)
-        { s: { r: 5, c: 7 }, e: { r: 6, c: 7 } }, // H6:H7 (Keterangan)
-      ];
-
-      // Lebar kolom
-      ws["!cols"] = [
-        { wch: 10 }, // A: No Urut
-        { wch: 16 }, // B: No Pol
-        { wch: 16 }, // C: Jenis Kend.
-        { wch: 14 }, // D: KM
-        { wch: 12 }, // E: Jam
-        { wch: 28 }, // F: Pengemudi
-        { wch: 20 }, // G: Tujuan
-        { wch: 16 }, // H: Keterangan
-      ];
-
-      // Tinggi baris
-      ws["!rows"] = [
-        { hpt: 12 },
-        { hpt: 12 },
-        { hpt: 26 }, // Title
-        { hpt: 20 }, // Tanggal
-        { hpt: 10 },
-        { hpt: 18 }, // Header 1
-        { hpt: 18 }, // Header 2
-        ...rows.map(() => ({ hpt: 22 })),
-      ];
-
-      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    // Generate binary blob dengan MIME Type Excel resmi
+    const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([wbout], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const file = new File([blob], fileName, {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     });
 
-    const fileName = `Laporan_Chek_List_Kendaraan_Penumpang_${format(new Date(), "yyyyMMdd_HHmm")}.xlsx`;
-    XLSX.writeFile(wb, fileName);
-    toast.success(`Berhasil mengekspor Laporan Chek List Kendaraan Penumpang (${dateKeys.length} sheet tanggal)!`);
+    // 1. Coba Web Share API (Fitur Android untuk langsung memilih aplikasi pembuka: Excel, WPS, Sheets, Drive)
+    if (typeof navigator !== "undefined" && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: fileName,
+          text: `Buka laporan hasil ekspor ${fileName}`,
+        });
+      } catch (err: any) {
+        // User dismiss share sheet
+      }
+    }
+
+    // 2. Download otomatis ke folder Download browser / Android
+    const downloadUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = downloadUrl;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+    }, 2000);
+
+    setExportModalOpen(false);
+
+    // 3. Tampilkan Modal Panduan Lokasi File di Android
+    setDownloadSuccessModal({
+      open: true,
+      fileName,
+      blob,
+      totalRows: filteredChecklists.length,
+    });
+
+    toast.success(`Berhasil mengekspor ${filteredChecklists.length} data riil!`);
+  };
+
+  const handleShareFileAgain = async () => {
+    if (!downloadSuccessModal.blob || !downloadSuccessModal.fileName) return;
+    const file = new File([downloadSuccessModal.blob], downloadSuccessModal.fileName, {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    if (typeof navigator !== "undefined" && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: downloadSuccessModal.fileName,
+          text: `Buka hasil ekspor ${downloadSuccessModal.fileName}`,
+        });
+      } catch (e) {
+        // ignore
+      }
+    } else {
+      const url = URL.createObjectURL(downloadSuccessModal.blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = downloadSuccessModal.fileName;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => document.body.removeChild(a), 2000);
+      toast.info("Mengunduh ulang file ke folder Download...");
+    }
   };
 
   // Download Template Import
@@ -416,7 +522,7 @@ export default function AdminVehicleMaintenancePage() {
           </label>
 
           <button
-            onClick={handleExportExcel}
+            onClick={() => setExportModalOpen(true)}
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all"
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
@@ -822,6 +928,200 @@ export default function AdminVehicleMaintenancePage() {
                 className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow-md shadow-red-600/20 transition-all flex items-center gap-1.5"
               >
                 {isDeleting ? "Menghapus..." : "Ya, Hapus Data"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Pilihan Format Ekspor Excel */}
+      {exportModalOpen && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in"
+          onClick={() => setExportModalOpen(false)}
+        >
+          <div 
+            className="glass-card max-w-lg w-full p-6 rounded-2xl border border-emerald-500/30 space-y-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-surface-800 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                  <FileSpreadsheet className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Ekspor Laporan ke Excel</h3>
+                  <p className="text-xs text-surface-400">Pilih format ekspor sesuai kebutuhan</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setExportModalOpen(false)}
+                className="p-1 rounded-lg text-surface-400 hover:text-white hover:bg-surface-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-xs font-semibold text-surface-300">Pilih Format Laporan:</p>
+
+              {/* Format 1: Laporan Kendaraan Penumpang */}
+              <div
+                onClick={() => setExportFormat("penumpang")}
+                className={cn(
+                  "p-4 rounded-xl border transition-all cursor-pointer",
+                  exportFormat === "penumpang"
+                    ? "bg-emerald-500/10 border-emerald-500/60 ring-1 ring-emerald-500/40"
+                    : "bg-surface-900/60 border-surface-800 hover:border-surface-700"
+                )}
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                      Laporan Kendaraan Penumpang
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                        Format Resmi Sesuai Contoh
+                      </span>
+                    </h4>
+                    <p className="text-xs text-surface-400 mt-1">
+                      Format rekapitulasi harian dengan judul "LAPORAN CHEK LIST KENDARAAN PENUMPANG", tanggal otomatis, dan multi-sheet tab per tanggal.
+                    </p>
+                    <div className="mt-2 text-[11px] text-surface-500 font-mono">
+                      Kolom: No Urut, No Pol, Jenis Kend., KM, Jam, Pengemudi, Tujuan, Keterangan
+                    </div>
+                  </div>
+                  <div className={cn(
+                    "w-5 h-5 rounded-full border flex items-center justify-center shrink-0 mt-0.5",
+                    exportFormat === "penumpang"
+                      ? "border-emerald-500 bg-emerald-500 text-white"
+                      : "border-surface-600 bg-surface-800"
+                  )}>
+                    {exportFormat === "penumpang" && <CheckCircle2 className="w-3.5 h-3.5" />}
+                  </div>
+                </div>
+              </div>
+
+              {/* Format 2: Rekap Lengkap Seluruh Data */}
+              <div
+                onClick={() => setExportFormat("lengkap")}
+                className={cn(
+                  "p-4 rounded-xl border transition-all cursor-pointer",
+                  exportFormat === "lengkap"
+                    ? "bg-brand-500/10 border-brand-500/60 ring-1 ring-brand-500/40"
+                    : "bg-surface-900/60 border-surface-800 hover:border-surface-700"
+                )}
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                      Rekap Lengkap Seluruh Data Ceklis
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                        Semua Poin Pemeriksaan
+                      </span>
+                    </h4>
+                    <p className="text-xs text-surface-400 mt-1">
+                      Mengekspor seluruh kolom form teknisi secara komprehensif (kondisi mesin, air radiator, aki, rem, ban, AC, perlengkapan, catatan).
+                    </p>
+                    <div className="mt-2 text-[11px] text-surface-500 font-mono">
+                      Kolom: No Ceklis, Tanggal, Jam, Nopol, KM, BBM, Teknisi, Driver, 20+ Poin Teknis
+                    </div>
+                  </div>
+                  <div className={cn(
+                    "w-5 h-5 rounded-full border flex items-center justify-center shrink-0 mt-0.5",
+                    exportFormat === "lengkap"
+                      ? "border-brand-500 bg-brand-500 text-white"
+                      : "border-surface-600 bg-surface-800"
+                  )}>
+                    {exportFormat === "lengkap" && <CheckCircle2 className="w-3.5 h-3.5" />}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-surface-900/80 border border-surface-800 text-xs text-surface-400 flex items-center justify-between">
+              <span>Data yang akan diekspor:</span>
+              <span className="font-bold text-white">{filteredChecklists.length} data riil (sesuai filter)</span>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setExportModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-surface-800 hover:bg-surface-700 text-surface-300 text-xs font-semibold transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => executeExport(exportFormat)}
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Ekspor Sekarang
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Panduan Lokasi File Hasil Ekspor di Android */}
+      {downloadSuccessModal.open && (
+        <div 
+          className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in"
+          onClick={() => setDownloadSuccessModal({ ...downloadSuccessModal, open: false })}
+        >
+          <div 
+            className="glass-card max-w-md w-full p-6 rounded-2xl border border-emerald-500/40 space-y-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                <CheckCircle2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">Laporan Berhasil Diekspor!</h3>
+                <p className="text-xs text-surface-400 mt-0.5">{downloadSuccessModal.totalRows} data riil telah dibuat ke file Excel</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-surface-950/80 border border-surface-800 space-y-1.5">
+              <p className="text-[11px] font-bold uppercase text-surface-400 tracking-wider">Nama File:</p>
+              <p className="text-xs font-mono font-semibold text-emerald-400 break-all">
+                {downloadSuccessModal.fileName}
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-surface-900/90 border border-surface-800 space-y-2 text-xs text-surface-300">
+              <div className="flex items-center gap-2 font-bold text-amber-400">
+                <FolderDown className="w-4 h-4" />
+                <span>Dimana Membuka File di HP Android?</span>
+              </div>
+              <ol className="list-decimal list-inside space-y-1.5 text-surface-300 text-[11px] leading-relaxed">
+                <li>
+                  Klik tombol <strong>"Buka / Bagikan File"</strong> di bawah untuk langsung membuka file dengan <strong>Excel</strong>, <strong>WPS Office</strong>, atau <strong>Google Sheets</strong> di HP Anda.
+                </li>
+                <li>
+                  Atau buka aplikasi <strong>Pengelola File / File Saya / Files</strong> di HP Anda, lalu masuk ke folder <strong>Download (Unduhan)</strong>. File otomatis tersimpan di sana.
+                </li>
+              </ol>
+            </div>
+
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                type="button"
+                onClick={handleShareFileAgain}
+                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-2"
+              >
+                <Share2 className="w-4 h-4" />
+                Buka / Bagikan File Langsung di HP
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setDownloadSuccessModal({ ...downloadSuccessModal, open: false })}
+                className="w-full py-2 rounded-xl bg-surface-800 hover:bg-surface-700 text-surface-300 text-xs font-semibold transition-colors"
+              >
+                Tutup
               </button>
             </div>
           </div>
