@@ -40,8 +40,12 @@ export default function UsersPage() {
   const userData = Array.isArray(users) ? users : [];
 
   const filteredUsers = userData.filter((user: any) => {
-    const matchesSearch = user.full_name.toLowerCase().includes(search.toLowerCase()) || 
-                          user.nik.toLowerCase().includes(search.toLowerCase());
+    const q = search.toLowerCase();
+    const matchesSearch = 
+      (user.full_name?.toLowerCase().includes(q) ?? false) || 
+      (user.nik?.toLowerCase().includes(q) ?? false) ||
+      (user.jabatan?.toLowerCase().includes(q) ?? false) ||
+      (user.position?.toLowerCase().includes(q) ?? false);
     const matchesRole = selectedRole === "all" || user.role === selectedRole;
     return matchesSearch && matchesRole;
   });
@@ -124,7 +128,9 @@ export default function UsersPage() {
 
   const downloadTemplate = () => {
     const templateData = [
-      { NIK: "TKP-001", "Nama Lengkap": "Contoh Nama", Username: "contoh", Password: "password123", Jabatan: "Driver", Role: "karyawan" }
+      { NIK: "TKP-001", "Nama Lengkap": "Ahmad Driver", Username: "ahmad", Password: "password123", Jabatan: "Driver", Role: "karyawan" },
+      { NIK: "TKP-002", "Nama Lengkap": "Budi Perawatan", Username: "budi", Password: "password123", Jabatan: "Admin Perawatan Kendaraan", Role: "karyawan" },
+      { NIK: "TKP-003", "Nama Lengkap": "Cahyo Teknisi", Username: "cahyo", Password: "password123", Jabatan: "Teknisi", Role: "karyawan" },
     ];
     const ws = XLSX.utils.json_to_sheet(templateData);
     ws['!cols'] = [
@@ -330,6 +336,11 @@ export default function UsersPage() {
                     <option value="">Pilih Jabatan</option>
                     <option value="Driver">Driver</option>
                     <option value="Admin">Admin</option>
+                    <option value="Admin Perawatan Kendaraan">Admin Perawatan Kendaraan</option>
+                    <option value="Teknisi">Teknisi</option>
+                    {jabatan && !["Driver", "Admin", "Admin Perawatan Kendaraan", "Teknisi"].includes(jabatan) && (
+                      <option value={jabatan}>{jabatan}</option>
+                    )}
                   </select>
                 </div>
                 <div className="space-y-1.5">
