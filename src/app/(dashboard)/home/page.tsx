@@ -35,13 +35,14 @@ export default function UserHomePage() {
   const recentVisits = Array.isArray(visitsData) ? visitsData : [];
   
   // Periksa apakah sedang menginap di hotel
-  const activeVisit = recentVisits.find((v: any) => !v.check_out_time);
+  const activeVisits = recentVisits.filter((v: any) => !v.check_out_time);
+  const activeVisit = !isAdmin ? activeVisits[0] : null;
 
   // Kumpulan 7 Menu Layanan Utama Beranda
   const menuList = [
     {
       name: "Kunjungan Hotel",
-      href: "/hotel-visit",
+      href: isAdmin ? "/admin/hotel-visits" : "/hotel-visit",
       icon: Building2,
       color: "border-indigo-500/40 bg-gradient-to-br from-indigo-500/20 to-blue-600/10 text-indigo-400 shadow-indigo-500/10",
     },
@@ -122,8 +123,40 @@ export default function UserHomePage() {
         </div>
       </div>
 
-      {/* Kartu Status Aktif (Tampil jika pengemudi sedang menginap di hotel) */}
-      {activeVisit && (
+      {/* Kartu Status Aktif (Tampil jika pengemudi sedang menginap di hotel atau jika admin memonitor) */}
+      {isAdmin && activeVisits.length > 0 ? (
+        <div className="glass-card p-3.5 relative overflow-hidden rounded-2xl bg-gradient-to-r from-amber-500/15 via-surface-900 to-brand-500/15 border border-amber-500/30 shadow-md">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center shrink-0">
+                <Building2 className="w-4 h-4 text-amber-400" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500"></span>
+                  </span>
+                  Monitoring Hotel Pengemudi
+                </p>
+                <p className="font-bold text-white text-xs sm:text-sm truncate mt-0.5">
+                  {activeVisits.length} Pengemudi Sedang Menginap
+                </p>
+                <p className="text-[10px] text-surface-400 truncate">
+                  {activeVisits.map((v: any) => v.user?.full_name || v.hotel_name).slice(0, 2).join(", ")}
+                  {activeVisits.length > 2 ? ` +${activeVisits.length - 2} lainnya` : ""}
+                </p>
+              </div>
+            </div>
+            <Link 
+              href="/admin/hotel-visits" 
+              className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-md shadow-amber-500/20 transition-all shrink-0"
+            >
+              Pantau
+            </Link>
+          </div>
+        </div>
+      ) : activeVisit && (
         <div className="glass-card p-3.5 relative overflow-hidden rounded-2xl bg-gradient-to-r from-amber-500/15 via-surface-900 to-brand-500/15 border border-amber-500/30 shadow-md">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">

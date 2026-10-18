@@ -24,17 +24,6 @@ export async function GET() {
     const user = await getUserFromToken();
     if (!user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
-    // Hapus riwayat yang lebih dari 1 bulan
-    const oneMonthAgo = new Date();
-    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-    await prisma.hotelVisit.deleteMany({
-      where: {
-        check_in_time: {
-          lt: oneMonthAgo
-        }
-      }
-    });
-
     let whereClause = {};
     if (user.role === 'karyawan') {
       whereClause = { user_id: user.id as string };
@@ -43,7 +32,7 @@ export async function GET() {
     const visits = await prisma.hotelVisit.findMany({
       where: whereClause,
       include: {
-        user: { select: { full_name: true, username: true } }
+        user: { select: { id: true, full_name: true, username: true, nik: true, jabatan: true } }
       },
       orderBy: { check_in_time: 'desc' }
     });

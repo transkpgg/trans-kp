@@ -64,3 +64,35 @@ export async function PUT(
     return NextResponse.json({ message: 'Server error' }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const user = await getUserFromToken();
+    if (!user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+
+    if (user.role === 'karyawan') {
+      return NextResponse.json({ message: 'Hanya admin yang dapat menghapus data kunjungan' }, { status: 403 });
+    }
+
+    const existingVisit = await prisma.hotelVisit.findUnique({
+      where: { id }
+    });
+
+    if (!existingVisit) {
+      return NextResponse.json({ message: 'Kunjungan tidak ditemukan' }, { status: 404 });
+    }
+
+    await prisma.hotelVisit.delete({
+      where: { id }
+    });
+
+    return NextResponse.json({ message: 'Data kunjungan berhasil dihapus' });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json({ message: 'Server error' }, { status: 500 });
+  }
+}

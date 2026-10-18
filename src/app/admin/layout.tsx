@@ -29,7 +29,7 @@ const adminNavItems = [
   { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
   { name: "Master Data", href: "/admin/master", icon: Database },
   { name: "Monitoring BBM", href: "/admin/fuel-monitoring", icon: Fuel },
-  { name: "Hotel Visit", href: "/admin/hotel-visits", icon: Building2 },
+  { name: "Kunjungan Hotel", href: "/admin/hotel-visits", icon: Building2 },
   { name: "E-Toll", href: "/admin/etoll", icon: CreditCard },
   { name: "Bon Pengemudi", href: "/admin/bon-pengemudi", icon: Receipt },
   { name: "Hitung UPD", href: "/admin/upd", icon: Calculator },

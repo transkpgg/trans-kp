@@ -24,7 +24,15 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
   const { data: meData } = useSWR("/api/auth/me", fetcher);
-  const currentUser = meData?.user || { full_name: "Memuat...", jabatan: "..." };
+  const currentUser = meData?.user || { full_name: "Memuat...", jabatan: "...", role: "karyawan" };
+  const isAdmin = currentUser.role === "admin_cabang" || currentUser.role === "super_admin";
+
+  const navItems = [
+    { name: "Home", href: "/home", icon: Home },
+    { name: "Hotel", href: isAdmin ? "/admin/hotel-visits" : "/hotel-visit", icon: Building2 },
+    { name: "Bon Pengemudi", href: "/bon-pengemudi", icon: Receipt },
+    { name: "Profil", href: "/profile", icon: User },
+  ];
 
   const handleLogout = async () => {
     try {

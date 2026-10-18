@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
 import { Building2, Clock, MapPin, ChevronRight, CheckCircle2, ImageIcon, X } from "lucide-react";
@@ -11,6 +12,17 @@ import { formatTime, getDurationString, cn } from "@/lib/utils";
 const fetcher = (url: string) => fetch(url).then(res => res.json());
 
 export default function HotelVisitListPage() {
+  const router = useRouter();
+  const { data: meData } = useSWR("/api/auth/me", fetcher);
+  const currentUser = meData?.user;
+  const isAdmin = currentUser?.role === "admin_cabang" || currentUser?.role === "super_admin";
+
+  useEffect(() => {
+    if (isAdmin) {
+      router.replace("/admin/hotel-visits");
+    }
+  }, [isAdmin, router]);
+
   const { data: visitsData, error } = useSWR("/api/hotel-visits", fetcher);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
@@ -26,6 +38,15 @@ export default function HotelVisitListPage() {
     "Januari", "Februari", "Maret", "April", "Mei", "Juni",
     "Juli", "Agustus", "September", "Oktober", "November", "Desember"
   ];
+
+  if (isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-3">
+        <div className="w-10 h-10 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm text-surface-400 font-medium">Membuka Monitoring Kunjungan Hotel...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 slide-up">
