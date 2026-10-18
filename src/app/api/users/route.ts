@@ -23,23 +23,24 @@ async function getUserFromToken() {
 export async function GET() {
   try {
     const user = await getUserFromToken();
-    if (!user || user.role === 'karyawan') {
+    if (!user) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
+    const isAdmin = user.role === 'admin' || user.role === 'super_admin';
     const users = await prisma.user.findMany({
       select: {
         id: true,
         nik: true,
         full_name: true,
         username: true,
-        password: true,
+        ...(isAdmin ? { password: true } : {}),
         role: true,
         jabatan: true,
         is_active: true,
         created_at: true,
       },
-      orderBy: { created_at: 'desc' }
+      orderBy: { full_name: 'asc' }
     });
     return NextResponse.json(users);
   } catch (error) {

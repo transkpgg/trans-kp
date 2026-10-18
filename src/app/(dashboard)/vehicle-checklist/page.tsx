@@ -26,7 +26,8 @@ import {
   ShieldCheck,
   Eye,
   Check,
-  ChevronDown
+  ChevronDown,
+  User
 } from "lucide-react";
 import useSWR from "swr";
 import { toast } from "sonner";
@@ -66,7 +67,17 @@ function TechnicianVehicleChecklistContent() {
 
   const checklists = Array.isArray(checklistsData) ? checklistsData : [];
   const vehicles = Array.isArray(vehiclesData) ? vehiclesData : [];
-  const drivers = Array.isArray(usersData) ? usersData.filter((u: any) => u.jabatan === "Driver" || u.role === "karyawan") : [];
+  const drivers = useMemo(() => {
+    if (!Array.isArray(usersData)) return [];
+    const activeUsers = usersData.filter((u: any) => u.is_active !== false);
+    const driverFiltered = activeUsers.filter((u: any) => {
+      const jab = (u.jabatan || "").toLowerCase();
+      if (jab.includes("driver") || jab.includes("pengemudi") || jab.includes("supir")) return true;
+      if (u.role === "karyawan" && !jab.includes("teknisi") && !jab.includes("perawatan") && !jab.includes("admin")) return true;
+      return false;
+    });
+    return driverFiltered.length > 0 ? driverFiltered : activeUsers.filter((u: any) => u.role === "karyawan" || u.role === "driver");
+  }, [usersData]);
 
   const [activeTab, setActiveTab] = useState<"form" | "history">(
     tabParam === "history" || tabParam === "dashboard" ? "history" : "form"
@@ -100,10 +111,16 @@ function TechnicianVehicleChecklistContent() {
   const [isVehicleDropdownOpen, setIsVehicleDropdownOpen] = useState(false);
   const vehicleDropdownRef = useRef<HTMLDivElement>(null);
 
+  const [isDriverDropdownOpen, setIsDriverDropdownOpen] = useState(false);
+  const driverDropdownRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (vehicleDropdownRef.current && !vehicleDropdownRef.current.contains(event.target as Node)) {
         setIsVehicleDropdownOpen(false);
+      }
+      if (driverDropdownRef.current && !driverDropdownRef.current.contains(event.target as Node)) {
+        setIsDriverDropdownOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -180,6 +197,18 @@ function TechnicianVehicleChecklistContent() {
   const [showTechPad, setShowTechPad] = useState(false);
   const [showSupervisorPad, setShowSupervisorPad] = useState(false);
 
+  const filteredDrivers = useMemo(() => {
+    if (!driverName) return drivers;
+    const q = driverName.toLowerCase();
+    return drivers.filter(
+      (d: any) =>
+        (d.full_name || "").toLowerCase().includes(q) ||
+        (d.nik || "").toLowerCase().includes(q) ||
+        (d.username || "").toLowerCase().includes(q) ||
+        (d.jabatan || "").toLowerCase().includes(q)
+    );
+  }, [drivers, driverName]);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Reset form
@@ -195,6 +224,8 @@ function TechnicianVehicleChecklistContent() {
     setSupervisorName("");
     setSupervisorSignature("");
     setStatus("Baik / Laik Jalan");
+    setIsVehicleDropdownOpen(false);
+    setIsDriverDropdownOpen(false);
   };
 
   // Submit Handler
@@ -683,22 +714,125 @@ function TechnicianVehicleChecklistContent() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               {/* Yang membuat: Pengemudi */}
-              <div className="p-4 rounded-xl bg-surface-900/60 border border-surface-800 space-y-3">
-                <p className="text-xs font-bold text-surface-400 uppercase">Yang Membuat (Pengemudi)</p>
-                <div className="space-y-1.5">
+              <div className="p-4 rounded-xl bg-surface-900/60 border border-surface-800 space-y-3" ref={driverDropdownRef}>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-surface-400 uppercase">Yang Membuat (Pengemudi)</p>
+                  <span className="text-[10px] text-surface-500 font-medium">Pilih / Ketik</span>
+                </div>
+                <div className="relative">
                   <input
                     type="text"
-                    list="driver-list"
-                    placeholder="Nama Pengemudi..."
+                    placeholder="Pilih nama pengemudi..."
                     value={driverName}
-                    onChange={(e) => setDriverName(e.target.value)}
-                    className="w-full bg-surface-900 border border-surface-700 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-brand-500"
+                    onFocus={() => setIsDriverDropdownOpen(true)}
+                    onChange={(e) => {
+                      setDriverName(e.target.value);
+                      setIsDriverDropdownOpen(true);
+                    }}
+                    className="w-full bg-surface-900 border border-surface-700 text-white rounded-xl pl-3 pr-16 py-2 text-xs focus:outline-none focus:border-brand-500 transition-colors"
                   />
-                  <datalist id="driver-list">
-                    {drivers.map((d: any) => (
-                      <option key={d.id} value={d.full_name}>{d.nik} - {d.full_name}</option>
-                    ))}
-                  </datalist>
+                  <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                    {driverName && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDriverName("");
+                          setIsDriverDropdownOpen(true);
+                        }}
+                        className="p-1 rounded-md text-surface-400 hover:text-white hover:bg-surface-800 transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setIsDriverDropdownOpen(!isDriverDropdownOpen)}
+                      className="p-1 rounded-md text-surface-400 hover:text-white transition-colors"
+                    >
+                      <ChevronDown className={cn("w-4 h-4 transition-transform duration-200", isDriverDropdownOpen && "rotate-180")} />
+                    </button>
+                  </div>
+
+                  {/* Dropdown List Pengemudi Kebawah */}
+                  {isDriverDropdownOpen && (
+                    <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-[#0F172A]/95 backdrop-blur-xl border border-surface-700/80 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                      <div className="p-2 border-b border-surface-800 text-[10px] font-bold text-surface-400 uppercase tracking-wider flex items-center justify-between">
+                        <span>Daftar Pengemudi ({filteredDrivers.length})</span>
+                        {driverName && (
+                          <button
+                            type="button"
+                            onClick={() => setDriverName("")}
+                            className="text-surface-400 hover:text-white"
+                          >
+                            Reset
+                          </button>
+                        )}
+                      </div>
+                      <div className="max-h-52 overflow-y-auto divide-y divide-surface-800/50 p-1 scrollbar-thin">
+                        {filteredDrivers.length === 0 ? (
+                          <div className="p-3 text-center text-xs text-surface-400">
+                            <p>Tidak ada pengemudi ditemukan.</p>
+                            <button
+                              type="button"
+                              onClick={() => setIsDriverDropdownOpen(false)}
+                              className="mt-1.5 text-xs text-brand-400 font-semibold hover:underline"
+                            >
+                              Gunakan "{driverName}"
+                            </button>
+                          </div>
+                        ) : (
+                          filteredDrivers.map((d: any) => {
+                            const isSelected = driverName.toLowerCase() === (d.full_name || "").toLowerCase();
+                            const initials = (d.full_name || "D")
+                              .split(" ")
+                              .map((n: string) => n[0])
+                              .slice(0, 2)
+                              .join("")
+                              .toUpperCase();
+
+                            return (
+                              <button
+                                key={d.id || d.nik}
+                                type="button"
+                                onClick={() => {
+                                  setDriverName(d.full_name);
+                                  setIsDriverDropdownOpen(false);
+                                }}
+                                className={cn(
+                                  "w-full px-3 py-2 rounded-xl text-left flex items-center justify-between transition-all group",
+                                  isSelected
+                                    ? "bg-brand-500/15 border border-brand-500/30 text-white"
+                                    : "hover:bg-surface-800/80 text-surface-300 hover:text-white"
+                                )}
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div className={cn(
+                                    "w-7 h-7 rounded-lg shrink-0 flex items-center justify-center font-bold text-[10px] transition-colors",
+                                    isSelected ? "bg-brand-500 text-white" : "bg-surface-800 text-brand-400 group-hover:bg-brand-500 group-hover:text-white"
+                                  )}>
+                                    {initials}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="font-semibold text-xs text-white truncate">
+                                      {d.full_name}
+                                    </p>
+                                    <div className="flex items-center gap-2 text-[10px] text-surface-400">
+                                      {d.nik && <span className="font-mono">{d.nik}</span>}
+                                      {d.nik && (d.jabatan || d.role) && <span>•</span>}
+                                      <span>{d.jabatan || d.role || "Driver"}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                {isSelected && (
+                                  <Check className="w-4 h-4 text-brand-400 shrink-0 ml-2" />
+                                )}
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <button
