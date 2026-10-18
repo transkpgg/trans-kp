@@ -20,7 +20,8 @@ import {
   Fuel,
   Calculator,
   Wrench,
-  Car
+  Car,
+  User
 } from "lucide-react";
 import { cn, getInitials } from "@/lib/utils";
 import { mockCurrentAdmin } from "@/lib/mock-data";
@@ -41,11 +42,12 @@ export default function AdminLayout({
   const isSuperAdmin = adminUser.role === "super_admin";
   const isMaintenanceAdmin = adminUser.jabatan === "Admin Perawatan Kendaraan";
 
-  // Khusus Admin Perawatan Kendaraan: HANYA tampilkan menu Perawatan Kendaraan & Master Kendaraan
+  // Khusus Admin Perawatan Kendaraan: Tampilkan Perawatan Kendaraan, Master Kendaraan & Profil
   const adminNavItems = (isMaintenanceAdmin && !isSuperAdmin)
     ? [
         { name: "Perawatan Kendaraan", href: "/admin/vehicle-maintenance", icon: Wrench },
         { name: "Master Kendaraan", href: "/admin/vehicles", icon: Car },
+        { name: "Profil", href: "/profile", icon: User },
       ]
     : [
         { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
@@ -57,6 +59,7 @@ export default function AdminLayout({
         { name: "Bon Pengemudi", href: "/admin/bon-pengemudi", icon: Receipt },
         { name: "Hitung UPD", href: "/admin/upd", icon: Calculator },
         { name: "Laporan", href: "/admin/reports", icon: FileBarChart },
+        { name: "Profil", href: "/profile", icon: User },
       ];
 
   // Batasi rute Admin Perawatan Kendaraan hanya ke Perawatan Kendaraan & Master Kendaraan
@@ -202,15 +205,15 @@ export default function AdminLayout({
               <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500 border border-surface-950" />
             </button>
             <div className="h-6 w-px bg-surface-700" />
-            <div className="flex items-center gap-3">
+            <Link href="/profile" className="flex items-center gap-3 group cursor-pointer">
               <div className="hidden sm:block text-right">
-                <p className="text-sm font-medium text-white leading-tight">{adminUser.full_name}</p>
+                <p className="text-sm font-medium text-white group-hover:text-brand-300 transition-colors leading-tight">{adminUser.full_name}</p>
                 <p className="text-xs text-brand-400 leading-tight">{adminUser.jabatan || adminUser.role.replace("_", " ")}</p>
               </div>
-              <div className="w-9 h-9 rounded-full gradient-brand flex items-center justify-center text-sm font-medium text-white shadow-lg cursor-pointer ring-2 ring-transparent hover:ring-brand-500/50 transition-all">
+              <div className="w-9 h-9 rounded-full gradient-brand flex items-center justify-center text-sm font-medium text-white shadow-lg ring-2 ring-transparent group-hover:ring-brand-500/50 transition-all">
                 {getInitials(adminUser.full_name)}
               </div>
-            </div>
+            </Link>
           </div>
         </header>
 

@@ -105,9 +105,15 @@ export default function UserHomePage() {
       icon: FileBarChart,
       color: "border-teal-500/40 bg-gradient-to-br from-teal-500/20 to-emerald-600/10 text-teal-400 shadow-teal-500/10",
     },
+    {
+      name: "Profil",
+      href: "/profile",
+      icon: User,
+      color: "border-purple-500/40 bg-gradient-to-br from-purple-500/20 to-violet-600/10 text-purple-400 shadow-purple-500/10",
+    },
   ];
 
-  // Khusus Admin Perawatan Kendaraan: HANYA tampilkan menu Perawatan Kendaraan & Master Kendaraan
+  // Khusus Admin Perawatan Kendaraan: Tampilkan Perawatan Kendaraan, Master Kendaraan & Profil
   const maintenanceAdminMenuList = [
     {
       name: "Perawatan Kendaraan",
@@ -120,6 +126,12 @@ export default function UserHomePage() {
       href: "/admin/vehicles",
       icon: Car,
       color: "border-cyan-500/40 bg-gradient-to-br from-cyan-500/20 to-blue-600/10 text-cyan-400 shadow-cyan-500/10",
+    },
+    {
+      name: "Profil",
+      href: "/profile",
+      icon: User,
+      color: "border-purple-500/40 bg-gradient-to-br from-purple-500/20 to-violet-600/10 text-purple-400 shadow-purple-500/10",
     },
   ];
 
