@@ -50,6 +50,8 @@ export default function AdminVehicleMaintenancePage() {
   );
 
   const checklists: any[] = Array.isArray(checklistsData) ? checklistsData : [];
+  const { data: vehiclesData } = useSWR(hasAccess ? "/api/vehicles" : null, fetcher);
+  const vehicles: any[] = Array.isArray(vehiclesData) ? vehiclesData : [];
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "laik" | "perbaikan">("all");
@@ -104,80 +106,150 @@ export default function AdminVehicleMaintenancePage() {
     });
   }, [checklists, search, statusFilter, dateRange]);
 
-  // Export ke Excel
+  // Export ke Excel Sesuai Format "LAPORAN CHEK LIST KENDARAAN PENUMPANG"
   const handleExportExcel = () => {
-    if (checklists.length === 0) {
+    if (filteredChecklists.length === 0) {
       toast.error("Tidak ada data ceklis untuk diekspor.");
       return;
     }
 
-    const exportData = filteredChecklists.map((c: any, index: number) => ({
-      "No": index + 1,
-      "No Ceklis": c.checklist_no || "-",
-      "Tanggal": format(new Date(c.date), "dd/MM/yyyy"),
-      "Jam": c.inspection_time || "-",
-      "Nomor Polisi": c.nopol,
-      "Kilometer (KM)": c.kilometer,
-      "Indikator BBM": c.fuel_level,
-      "Tujuan Keberangkatan": c.destination || "Dalam Kota",
-      "Status Kelayakan": c.status,
-      "Nama Pengemudi": c.driver_name || "-",
-      "Teknisi Pemeriksa": c.technician_name || "-",
-      "Pengawas": c.supervisor_name || "-",
-      
-      // Detail Mesin & Cairan
-      "Oli Mesin": c.engine_oil,
-      "Air Radiator": c.radiator_water,
-      "Accu / Air Accu": c.battery_water,
-      "Oli Powersteer": c.power_steering_oil,
-      "V. Belt": c.v_belt,
-      "Understell": c.understell,
-      "Indikator Dashboard": c.dashboard_indicator,
-      "Kondisi Mesin": c.engine_condition,
+    // Grouping data berdasarkan tanggal inspeksi (yyyy-MM-dd)
+    const groupedByDate: Record<string, any[]> = {};
+    filteredChecklists.forEach((item: any) => {
+      const dStr = item.date ? format(new Date(item.date), "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd");
+      if (!groupedByDate[dStr]) {
+        groupedByDate[dStr] = [];
+      }
+      groupedByDate[dStr].push(item);
+    });
 
-      // Kelengkapan
-      "Kunci Roda": c.wheel_wrench,
-      "Dongkrak": c.jack,
-      "Segitiga Pengaman": c.safety_triangle,
-      "Kotak P3K": c.first_aid_box,
-      "STNK / PKB": c.stnk_pkb,
+    const dateKeys = Object.keys(groupedByDate).sort();
+    if (dateKeys.length === 0) {
+      toast.error("Tidak ada data tanggal yang valid untuk diekspor.");
+      return;
+    }
 
-      // Ban
-      "Ban Utama": c.main_tire_condition,
-      "Ban Serep": c.spare_tire_condition,
-
-      // Accesories & Lampu
-      "Kondisi AC": c.ac_condition,
-      "Radio / Tape": c.radio_tape,
-      "Pemantik Rokok": c.cigarette_lighter,
-      "Lampu-Lampu": c.lights_condition,
-      "Catatan Lampu": c.lights_notes || "-",
-
-      // Rem
-      "Kerja Rem": c.brake_operation,
-      "Minyak Rem": c.brake_fluid,
-      "Rem Tangan": c.hand_brake,
-
-      "Catatan Umum": c.general_notes || "-",
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Rekap Ceklis Teknisi");
-    
-    // Auto column widths
-    const cols = Object.keys(exportData[0] || {}).map(() => ({ wch: 18 }));
-    cols[0] = { wch: 6 };
-    cols[1] = { wch: 20 };
-    cols[4] = { wch: 14 };
-    cols[7] = { wch: 22 };
-    cols[9] = { wch: 22 };
-    cols[10] = { wch: 22 };
-    ws['!cols'] = cols;
 
-    const fileName = `Rekap_Ceklis_Perawatan_Kendaraan_${format(new Date(), "yyyyMMdd_HHmm")}.xlsx`;
+    dateKeys.forEach((dateKey) => {
+      const items = groupedByDate[dateKey];
+      const dateObj = new Date(dateKey);
+      // Format nama tab: ddMMMyy (contoh: 15Okt26)
+      const sheetName = format(dateObj, "ddMMMyy", { locale: id });
+      // Format judul tanggal: TANGGAL [d MMMM yyyy] (contoh: TANGGAL 15 Oktober 2026)
+      const formattedDateTitle = format(dateObj, "d MMMM yyyy", { locale: id });
+
+      // Urutkan data berdasarkan jam inspeksi / keberangkatan (terbaru ke terlama)
+      const sortedItems = [...items].sort((a: any, b: any) => {
+        const timeA = a.inspection_time || "";
+        const timeB = b.inspection_time || "";
+        return timeB.localeCompare(timeA);
+      });
+
+      // Baris data terisi
+      const rows: any[][] = sortedItems.map((c: any, index: number) => {
+        // Cari jenis kendaraan dari master
+        const vMatch = vehicles.find((v: any) =>
+          v.nopol?.replace(/\s+/g, "").toUpperCase() === (c.nopol || "").replace(/\s+/g, "").toUpperCase()
+        );
+        const jenisKend = vMatch?.type || vMatch?.name || "Mini Bus";
+
+        // Format KM (contoh: 310,118)
+        let formattedKm = c.kilometer || "-";
+        const cleanKm = Number(String(c.kilometer).replace(/[^0-9]/g, ""));
+        if (!isNaN(cleanKm) && cleanKm > 0) {
+          formattedKm = cleanKm.toLocaleString("en-US");
+        }
+
+        // Format Jam (contoh: 16.00)
+        const formattedJam = (c.inspection_time || "-").replace(":", ".");
+        const tujuan = c.destination || "Stanby";
+        const keterangan = c.status === "Baik / Laik Jalan" ? "Siap" : (c.general_notes || "Perlu Perbaikan");
+
+        return [
+          index + 1,
+          c.nopol || "-",
+          jenisKend,
+          formattedKm,
+          formattedJam,
+          c.driver_name || "-",
+          tujuan,
+          keterangan,
+        ];
+      });
+
+      // Lengkapi baris template minimal 15 baris sesuai format fisik
+      const minRows = 15;
+      for (let r = rows.length + 1; r <= minRows; r++) {
+        rows.push([r, "", "", "", "", "", "", "Siap"]);
+      }
+
+      // Struktur sheet lengkap:
+      // Baris 1: Kosong
+      // Baris 2: Kosong
+      // Baris 3: Judul (LAPORAN CHEK LIST KENDARAAN PENUMPANG)
+      // Baris 4: Tanggal otomatis (TANGGAL 15 Oktober 2026)
+      // Baris 5: Kosong
+      // Baris 6: Header Kolom
+      // Baris 7: Header Kolom Baris 2 (untuk merge)
+      // Baris 8+: Data
+      const sheetData: any[][] = [
+        [],
+        [],
+        ["LAPORAN CHEK LIST KENDARAAN PENUMPANG"],
+        [`TANGGAL ${formattedDateTitle}`],
+        [],
+        ["No Urut", "No Pol", "Jenis Kend.", "KM", "Jam", "Pengemudi", "Tujuan", "Keterangan"],
+        ["", "", "", "", "", "", "", ""],
+        ...rows,
+      ];
+
+      const ws = XLSX.utils.aoa_to_sheet(sheetData);
+
+      // Penggabungan cell (Merges)
+      ws["!merges"] = [
+        { s: { r: 2, c: 0 }, e: { r: 2, c: 7 } }, // A3:H3 (Judul)
+        { s: { r: 3, c: 0 }, e: { r: 3, c: 7 } }, // A4:H4 (Tanggal)
+        { s: { r: 5, c: 0 }, e: { r: 6, c: 0 } }, // A6:A7 (No Urut)
+        { s: { r: 5, c: 1 }, e: { r: 6, c: 1 } }, // B6:B7 (No Pol)
+        { s: { r: 5, c: 2 }, e: { r: 6, c: 2 } }, // C6:C7 (Jenis Kend.)
+        { s: { r: 5, c: 3 }, e: { r: 6, c: 3 } }, // D6:D7 (KM)
+        { s: { r: 5, c: 4 }, e: { r: 6, c: 4 } }, // E6:E7 (Jam)
+        { s: { r: 5, c: 5 }, e: { r: 6, c: 5 } }, // F6:F7 (Pengemudi)
+        { s: { r: 5, c: 6 }, e: { r: 6, c: 6 } }, // G6:G7 (Tujuan)
+        { s: { r: 5, c: 7 }, e: { r: 6, c: 7 } }, // H6:H7 (Keterangan)
+      ];
+
+      // Lebar kolom
+      ws["!cols"] = [
+        { wch: 10 }, // A: No Urut
+        { wch: 16 }, // B: No Pol
+        { wch: 16 }, // C: Jenis Kend.
+        { wch: 14 }, // D: KM
+        { wch: 12 }, // E: Jam
+        { wch: 28 }, // F: Pengemudi
+        { wch: 20 }, // G: Tujuan
+        { wch: 16 }, // H: Keterangan
+      ];
+
+      // Tinggi baris
+      ws["!rows"] = [
+        { hpt: 12 },
+        { hpt: 12 },
+        { hpt: 26 }, // Title
+        { hpt: 20 }, // Tanggal
+        { hpt: 10 },
+        { hpt: 18 }, // Header 1
+        { hpt: 18 }, // Header 2
+        ...rows.map(() => ({ hpt: 22 })),
+      ];
+
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    });
+
+    const fileName = `Laporan_Chek_List_Kendaraan_Penumpang_${format(new Date(), "yyyyMMdd_HHmm")}.xlsx`;
     XLSX.writeFile(wb, fileName);
-    toast.success(`Berhasil mengekspor ${exportData.length} data ceklis ke Excel!`);
+    toast.success(`Berhasil mengekspor Laporan Chek List Kendaraan Penumpang (${dateKeys.length} sheet tanggal)!`);
   };
 
   // Download Template Import
