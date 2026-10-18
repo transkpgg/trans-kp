@@ -2,10 +2,11 @@
 
 import { useMemo, useState, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
 import useSWR from "swr";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
-import { Car, Plus, Search, Edit, Trash2, X, CheckCircle2, Ban, Upload, FileSpreadsheet, Fuel } from "lucide-react";
+import { Car, Plus, Search, Edit, Trash2, X, CheckCircle2, Ban, Upload, FileSpreadsheet, Fuel, ShieldAlert, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -17,11 +18,14 @@ export default function VehiclesPage() {
   const pathname = usePathname();
   const router = useRouter();
 
-  useEffect(() => {
-    if (pathname === "/admin/vehicles") {
-      router.replace("/admin/master?tab=vehicles");
-    }
-  }, [pathname, router]);
+  const { data: meData, isLoading: isMeLoading } = useSWR("/api/auth/me", fetcher);
+  const currentUser = meData?.user;
+
+  // Akses dibuka untuk Super Admin, Admin, dan Admin Perawatan Kendaraan
+  const isSuperAdmin = currentUser?.role === "super_admin";
+  const isAdmin = currentUser?.role === "admin" || currentUser?.role === "admin_cabang";
+  const isMaintenanceAdmin = currentUser?.jabatan === "Admin Perawatan Kendaraan";
+  const hasAccess = isSuperAdmin || isAdmin || isMaintenanceAdmin;
 
   const { data, mutate, isLoading } = useSWR("/api/vehicles", fetcher);
   const vehicles: any[] = Array.isArray(data) ? data : [];
@@ -160,6 +164,27 @@ export default function VehiclesPage() {
   const inputCls =
     "w-full bg-surface-950 border border-surface-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50";
   const labelCls = "text-xs font-semibold uppercase tracking-wider text-surface-400";
+
+  if (!isMeLoading && currentUser && !hasAccess) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-6">
+        <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 mb-4 shadow-lg shadow-red-500/10">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-bold text-white mb-2">Akses Terbatas</h2>
+        <p className="text-sm text-surface-400 max-w-md mb-6">
+          Halaman Master Kendaraan hanya dapat diakses oleh Super Admin, Admin, dan Admin Perawatan Kendaraan.
+        </p>
+        <Link
+          href="/home"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-surface-800 hover:bg-surface-700 text-white text-sm font-medium transition-all"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Kembali ke Beranda
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 slide-up">

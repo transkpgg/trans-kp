@@ -13,7 +13,16 @@ async function getUserFromToken() {
   if (!token) return null;
   try {
     const { payload } = await jose.jwtVerify(token, JWT_SECRET);
-    return payload;
+    if (!payload.id) return null;
+    const user = await prisma.user.findUnique({
+      where: { id: payload.id as string },
+      select: {
+        id: true,
+        role: true,
+        jabatan: true,
+      }
+    });
+    return user;
   } catch (e) {
     return null;
   }
@@ -23,7 +32,9 @@ async function getUserFromToken() {
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getUserFromToken();
-    if (!user || user.role === 'karyawan') {
+    const isMaintenanceAdmin = user?.jabatan === 'Admin Perawatan Kendaraan';
+    const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+    if (!user || (!isAdmin && !isMaintenanceAdmin)) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
     const { id } = await params;
@@ -61,7 +72,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getUserFromToken();
-    if (!user || user.role === 'karyawan') {
+    const isMaintenanceAdmin = user?.jabatan === 'Admin Perawatan Kendaraan';
+    const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+    if (!user || (!isAdmin && !isMaintenanceAdmin)) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
     const { id } = await params;

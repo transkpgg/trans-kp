@@ -16,7 +16,8 @@ export async function middleware(request: NextRequest) {
                           path.startsWith('/profile') || 
                           path.startsWith('/hotel-visit') || 
                           path.startsWith('/bon-pengemudi') || 
-                          path.startsWith('/history');
+                          path.startsWith('/history') ||
+                          path.startsWith('/vehicle-checklist');
 
   if (isProtectedPath) {
     if (!token) {
@@ -27,8 +28,16 @@ export async function middleware(request: NextRequest) {
       // Verifikasi token
       const { payload } = await jose.jwtVerify(token, JWT_SECRET);
       
-      // Jika mencoba akses admin tapi bukan admin (kecuali menu Hitung UPD dan E-Toll yang terbuka untuk semua staf & pengemudi)
-      if (path.startsWith('/admin') && !path.startsWith('/admin/upd') && !path.startsWith('/admin/etoll') && payload.role === 'karyawan') {
+      // Jika mencoba akses admin tapi role karyawan (bukan admin)
+      // Pengecualian rute:
+      // - /admin/upd dan /admin/etoll (terbuka untuk staf/driver)
+      // - /admin/vehicle-maintenance dan /admin/vehicles (dijaga oleh role/jabatan di level halaman & API)
+      const isExemptAdminPath = path.startsWith('/admin/upd') || 
+                                path.startsWith('/admin/etoll') ||
+                                path.startsWith('/admin/vehicle-maintenance') ||
+                                path.startsWith('/admin/vehicles');
+
+      if (path.startsWith('/admin') && !isExemptAdminPath && payload.role === 'karyawan') {
         return NextResponse.redirect(new URL('/home', request.url));
       }
       
@@ -60,6 +69,7 @@ export const config = {
     '/hotel-visit/:path*',
     '/bon-pengemudi/:path*',
     '/history',
+    '/vehicle-checklist/:path*',
     '/login'
   ]
 };

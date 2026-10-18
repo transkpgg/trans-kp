@@ -14,7 +14,16 @@ async function getUserFromToken() {
   if (!token) return null;
   try {
     const { payload } = await jose.jwtVerify(token, JWT_SECRET);
-    return payload;
+    if (!payload.id) return null;
+    const user = await prisma.user.findUnique({
+      where: { id: payload.id as string },
+      select: {
+        id: true,
+        role: true,
+        jabatan: true,
+      }
+    });
+    return user;
   } catch {
     return null;
   }
@@ -32,12 +41,14 @@ function pick(row: Record<string, unknown>, keys: string[]): string {
   return '';
 }
 
-// POST /api/vehicles/import - impor kendaraan dari Excel (admin saja)
+// POST /api/vehicles/import - impor kendaraan dari Excel (admin & admin perawatan kendaraan)
 // Kolom template: "Nopol" (wajib), "Jenis Kendaraan", "Konsumsi BBM (1 L/km)"
 export async function POST(request: NextRequest) {
   try {
     const user = await getUserFromToken();
-    if (!user || user.role === 'karyawan') {
+    const isMaintenanceAdmin = user?.jabatan === 'Admin Perawatan Kendaraan';
+    const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+    if (!user || (!isAdmin && !isMaintenanceAdmin)) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 

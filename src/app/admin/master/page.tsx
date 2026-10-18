@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import useSWR from "swr";
 import { Users, Car, MapPin, Database } from "lucide-react";
 import { cn } from "@/lib/utils";
 import UsersPage from "../users/page";
@@ -12,8 +13,19 @@ function MasterDataContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
+  const { data: meData } = useSWR("/api/auth/me", (url: string) => fetch(url).then(r => r.json()));
+  const currentUser = meData?.user;
+  const isSuperAdmin = currentUser?.role === "super_admin";
+  const isMaintenanceAdmin = currentUser?.jabatan === "Admin Perawatan Kendaraan";
+
   const activeTabParam = searchParams.get("tab") || "users";
   const [activeTab, setActiveTab] = useState(activeTabParam);
+
+  useEffect(() => {
+    if (currentUser && isMaintenanceAdmin && !isSuperAdmin) {
+      router.replace("/admin/vehicles");
+    }
+  }, [currentUser, isMaintenanceAdmin, isSuperAdmin, router]);
 
   useEffect(() => {
     setActiveTab(activeTabParam);

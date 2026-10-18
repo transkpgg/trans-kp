@@ -13,7 +13,8 @@ import {
   Database, 
   FileBarChart, 
   Clock,
-  Wrench
+  Wrench,
+  Car
 } from "lucide-react";
 import { formatTime, cn, getInitials } from "@/lib/utils";
 import useSWR from "swr";
@@ -104,7 +105,23 @@ export default function UserHomePage() {
     },
   ];
 
-  const menuList = baseMenuList;
+  // Khusus Admin Perawatan Kendaraan: HANYA tampilkan menu Perawatan Kendaraan & Master Kendaraan
+  const maintenanceAdminMenuList = [
+    {
+      name: "Perawatan Kendaraan",
+      href: "/admin/vehicle-maintenance",
+      icon: Wrench,
+      color: "border-orange-500/40 bg-gradient-to-br from-orange-500/20 to-amber-600/10 text-orange-400 shadow-orange-500/10",
+    },
+    {
+      name: "Master Kendaraan",
+      href: "/admin/vehicles",
+      icon: Car,
+      color: "border-cyan-500/40 bg-gradient-to-br from-cyan-500/20 to-blue-600/10 text-cyan-400 shadow-cyan-500/10",
+    },
+  ];
+
+  const menuList = (isMaintenanceAdmin && !isSuperAdmin) ? maintenanceAdminMenuList : baseMenuList;
 
   return (
     <div className="space-y-4 w-full max-w-full overflow-hidden">

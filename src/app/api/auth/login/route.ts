@@ -66,7 +66,8 @@ export async function POST(request: Request) {
       id: user.id, 
       role: user.role, 
       username: user.username,
-      full_name: user.full_name
+      full_name: user.full_name,
+      jabatan: (user as any).jabatan || (user as any).position || ''
     })
       .setProtectedHeader({ alg })
       .setIssuedAt()

@@ -14,9 +14,12 @@ export function MobileBottomNav() {
   const role = meData?.user?.role;
 
   // Tentukan rute Dashboard sesuai role:
-  // Jika admin / super_admin -> /admin/dashboard
-  // Jika karyawan / driver -> /history (Dashboard Riwayat Aktivitas & Absensi)
-  const dashboardHref = role === "karyawan" ? "/history" : "/admin/dashboard";
+  const isMaintenanceAdmin = meData?.user?.jabatan === "Admin Perawatan Kendaraan";
+  const dashboardHref = isMaintenanceAdmin 
+    ? "/admin/vehicle-maintenance" 
+    : role === "karyawan" 
+      ? "/history" 
+      : "/admin/dashboard";
 
   const isBerandaActive =
     pathname === "/home" ||

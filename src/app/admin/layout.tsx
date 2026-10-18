@@ -19,7 +19,8 @@ import {
   Database,
   Fuel,
   Calculator,
-  Wrench
+  Wrench,
+  Car
 } from "lucide-react";
 import { cn, getInitials } from "@/lib/utils";
 import { mockCurrentAdmin } from "@/lib/mock-data";
@@ -40,19 +41,34 @@ export default function AdminLayout({
   const isSuperAdmin = adminUser.role === "super_admin";
   const isMaintenanceAdmin = adminUser.jabatan === "Admin Perawatan Kendaraan";
 
-  const adminNavItems = [
-    { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
-    { name: "Master Data", href: "/admin/master", icon: Database },
-    ...((isSuperAdmin || isMaintenanceAdmin) ? [
-      { name: "Perawatan Kendaraan", href: "/admin/vehicle-maintenance", icon: Wrench },
-    ] : []),
-    { name: "Monitoring BBM", href: "/admin/fuel-monitoring", icon: Fuel },
-    { name: "Kunjungan Hotel", href: "/admin/hotel-visits", icon: Building2 },
-    { name: "E-Toll", href: "/admin/etoll", icon: CreditCard },
-    { name: "Bon Pengemudi", href: "/admin/bon-pengemudi", icon: Receipt },
-    { name: "Hitung UPD", href: "/admin/upd", icon: Calculator },
-    { name: "Laporan", href: "/admin/reports", icon: FileBarChart },
-  ];
+  // Khusus Admin Perawatan Kendaraan: HANYA tampilkan menu Perawatan Kendaraan & Master Kendaraan
+  const adminNavItems = (isMaintenanceAdmin && !isSuperAdmin)
+    ? [
+        { name: "Perawatan Kendaraan", href: "/admin/vehicle-maintenance", icon: Wrench },
+        { name: "Master Kendaraan", href: "/admin/vehicles", icon: Car },
+      ]
+    : [
+        { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
+        { name: "Master Data", href: "/admin/master", icon: Database },
+        { name: "Perawatan Kendaraan", href: "/admin/vehicle-maintenance", icon: Wrench },
+        { name: "Monitoring BBM", href: "/admin/fuel-monitoring", icon: Fuel },
+        { name: "Kunjungan Hotel", href: "/admin/hotel-visits", icon: Building2 },
+        { name: "E-Toll", href: "/admin/etoll", icon: CreditCard },
+        { name: "Bon Pengemudi", href: "/admin/bon-pengemudi", icon: Receipt },
+        { name: "Hitung UPD", href: "/admin/upd", icon: Calculator },
+        { name: "Laporan", href: "/admin/reports", icon: FileBarChart },
+      ];
+
+  // Batasi rute Admin Perawatan Kendaraan hanya ke Perawatan Kendaraan & Master Kendaraan
+  useEffect(() => {
+    if (meData?.user && isMaintenanceAdmin && !isSuperAdmin) {
+      const allowedPaths = ["/admin/vehicle-maintenance", "/admin/vehicles"];
+      const isAllowed = allowedPaths.some(p => pathname === p || pathname.startsWith(`${p}/`));
+      if (!isAllowed) {
+        router.replace("/admin/vehicle-maintenance");
+      }
+    }
+  }, [meData, isMaintenanceAdmin, isSuperAdmin, pathname, router]);
 
   const seenNotifications = useRef<Set<string>>(new Set());
 
@@ -189,7 +205,7 @@ export default function AdminLayout({
             <div className="flex items-center gap-3">
               <div className="hidden sm:block text-right">
                 <p className="text-sm font-medium text-white leading-tight">{adminUser.full_name}</p>
-                <p className="text-xs text-brand-400 leading-tight">{adminUser.role.replace("_", " ")}</p>
+                <p className="text-xs text-brand-400 leading-tight">{adminUser.jabatan || adminUser.role.replace("_", " ")}</p>
               </div>
               <div className="w-9 h-9 rounded-full gradient-brand flex items-center justify-center text-sm font-medium text-white shadow-lg cursor-pointer ring-2 ring-transparent hover:ring-brand-500/50 transition-all">
                 {getInitials(adminUser.full_name)}
