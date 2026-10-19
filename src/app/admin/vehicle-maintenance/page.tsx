@@ -71,18 +71,21 @@ export default function AdminVehicleMaintenancePage() {
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState<"penumpang" | "lengkap">("penumpang");
   const [exportScope, setExportScope] = useState<"filtered" | "all">("filtered");
+  const [isExporting, setIsExporting] = useState(false);
   const [downloadSuccessModal, setDownloadSuccessModal] = useState<{
     open: boolean;
     fileName: string;
     blob: Blob | null;
     url: string;
     totalRows: number;
+    records: any[];
   }>({
     open: false,
     fileName: "",
     blob: null,
     url: "",
     totalRows: 0,
+    records: [],
   });
 
   // Summary Metrics
@@ -132,7 +135,7 @@ export default function AdminVehicleMaintenancePage() {
     return exportScope === "all" ? checklists : filteredChecklists;
   }, [exportScope, checklists, filteredChecklists]);
 
-  // Export ke Excel Menggunakan Endpoint Resmi Server (Trigger Android Download Manager & Native Share)
+  // Export ke Excel Menggunakan Endpoint Resmi Server Tanpa Menavigasi WebView
   const executeExport = async (formatType: "penumpang" | "lengkap") => {
     if (targetExportList.length === 0) {
       toast.error("Tidak ada data ceklis untuk diekspor.");
@@ -145,97 +148,97 @@ export default function AdminVehicleMaintenancePage() {
 
     const exportUrl = `/api/vehicle-checklists/export?format=${formatType}&scope=${exportScope}&startDate=${dateRange.start}&endDate=${dateRange.end}&status=${statusFilter}&search=${encodeURIComponent(search)}`;
 
-    // 1. Trigger langsung ke sistem Android Download Manager via HTTP download
-    const a = document.createElement("a");
-    a.href = exportUrl;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-      document.body.removeChild(a);
-    }, 2000);
+    setIsExporting(true);
 
-    setExportModalOpen(false);
-
-    // 2. Fetch blob untuk mendukung tombol "Buka / Bagikan Langsung" di HP (Web Share API)
     try {
+      // 1. Ambil data binary blob langsung di memori (tidak menavigasi webview agar halaman tidak blank di HP)
       const res = await fetch(exportUrl);
-      if (res.ok) {
-        const blob = await res.blob();
-        const file = new File([blob], fileName, {
-          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        });
-
-        // Jika HP mendukung Web Share API file, buka menu pilihan aplikasi Android (Excel, WPS, Sheets)
-        if (typeof navigator !== "undefined" && navigator.canShare && navigator.canShare({ files: [file] })) {
-          try {
-            await navigator.share({
-              files: [file],
-              title: fileName,
-              text: `Buka laporan hasil ekspor ${fileName}`,
-            });
-          } catch (err: any) {
-            // User dismiss share sheet
-          }
-        }
-
-        setDownloadSuccessModal({
-          open: true,
-          fileName,
-          blob,
-          url: exportUrl,
-          totalRows: targetExportList.length,
-        });
-      } else {
-        setDownloadSuccessModal({
-          open: true,
-          fileName,
-          blob: null,
-          url: exportUrl,
-          totalRows: targetExportList.length,
-        });
+      if (!res.ok) {
+        throw new Error("Gagal mengambil data dari server");
       }
-    } catch (e) {
+      const blob = await res.blob();
+
+      // 2. Tutup modal opsi dan BUKA modal hasil ekspor (Pop-up Hasil Ekspor)
+      setExportModalOpen(false);
       setDownloadSuccessModal({
         open: true,
         fileName,
-        blob: null,
+        blob,
         url: exportUrl,
         totalRows: targetExportList.length,
+        records: targetExportList,
       });
-    }
 
-    toast.success(`Berhasil mengekspor ${targetExportList.length} data riil!`);
+      // 3. Jika pengguna membuka dari browser PC/Desktop, otomatis unduh via blob
+      const isMobileDevice = typeof window !== "undefined" && (
+        !!(window as any).isFlutterApp ||
+        !!(window as any).FlutterNFCChannel ||
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      );
+
+      if (!isMobileDevice) {
+        const blobUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(blobUrl);
+        }, 1500);
+      }
+
+      toast.success(`Laporan siap! (${targetExportList.length} data riil)`);
+    } catch (e: any) {
+      console.error("Export error:", e);
+      toast.error("Gagal menyiapkan laporan: " + (e?.message || "Terjadi kesalahan jaringan"));
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleShareFileAgain = async () => {
-    if (downloadSuccessModal.blob && downloadSuccessModal.fileName) {
-      const file = new File([downloadSuccessModal.blob], downloadSuccessModal.fileName, {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
-      if (typeof navigator !== "undefined" && navigator.canShare && navigator.canShare({ files: [file] })) {
-        try {
+    if (!downloadSuccessModal.blob) {
+      toast.error("Data file tidak ditemukan.");
+      return;
+    }
+
+    const file = new File([downloadSuccessModal.blob], downloadSuccessModal.fileName, {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+
+    // 1. Coba Web Share API (didukung di HP Android / Chrome)
+    if (typeof navigator !== "undefined" && typeof navigator.canShare === "function") {
+      try {
+        if (navigator.canShare({ files: [file] })) {
           await navigator.share({
             files: [file],
             title: downloadSuccessModal.fileName,
-            text: `Buka hasil ekspor ${downloadSuccessModal.fileName}`,
+            text: `Buka Laporan Ceklis Kendaraan (${downloadSuccessModal.totalRows} data)`,
           });
           return;
-        } catch (e) {
-          // ignore
         }
+      } catch (err) {
+        console.log("Share cancelled or not allowed:", err);
       }
     }
 
-    // Fallback: Trigger direct download again
-    if (downloadSuccessModal.url) {
+    // 2. Fallback: Unduh via Blob URL langsung
+    try {
+      const blobUrl = window.URL.createObjectURL(downloadSuccessModal.blob);
       const a = document.createElement("a");
-      a.href = downloadSuccessModal.url;
+      a.href = blobUrl;
       a.download = downloadSuccessModal.fileName;
       document.body.appendChild(a);
       a.click();
-      setTimeout(() => document.body.removeChild(a), 2000);
-      toast.info("Mengunduh ulang file ke folder Download HP...");
+      setTimeout(() => {
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(blobUrl);
+      }, 1500);
+      toast.success("File telah diunduh ke memori perangkat!");
+    } catch (e) {
+      toast.error("Gagal mengunduh file.");
     }
   };
 
@@ -974,75 +977,117 @@ export default function AdminVehicleMaintenancePage() {
             <div className="flex justify-end gap-3 pt-2">
               <button
                 type="button"
+                disabled={isExporting}
                 onClick={() => setExportModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-surface-800 hover:bg-surface-700 text-surface-300 text-xs font-semibold transition-colors"
+                className="px-4 py-2 rounded-xl bg-surface-800 hover:bg-surface-700 text-surface-300 text-xs font-semibold transition-colors disabled:opacity-50"
               >
                 Batal
               </button>
               <button
                 type="button"
+                disabled={isExporting}
                 onClick={() => executeExport(exportFormat)}
-                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2"
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2 disabled:opacity-50"
               >
-                <Download className="w-4 h-4" />
-                Ekspor Sekarang
+                {isExporting ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Menyiapkan Laporan...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    Ekspor Sekarang
+                  </>
+                )}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal: Panduan Lokasi File Hasil Ekspor di Android */}
+      {/* Modal: Pop-Up Hasil Ekspor Laporan Kendaraan */}
       {downloadSuccessModal.open && (
         <div 
-          className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in"
+          className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in"
           onClick={() => setDownloadSuccessModal({ ...downloadSuccessModal, open: false })}
         >
           <div 
-            className="glass-card max-w-md w-full p-6 rounded-2xl border border-emerald-500/40 space-y-4 shadow-2xl"
+            className="glass-card max-w-lg w-full p-6 rounded-2xl border border-emerald-500/40 space-y-4 shadow-2xl max-h-[92vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
                 <CheckCircle2 className="w-6 h-6" />
               </div>
-              <div>
+              <div className="flex-1 min-w-0">
                 <h3 className="text-base font-bold text-white">Laporan Berhasil Diekspor!</h3>
-                <p className="text-xs text-surface-400 mt-0.5">{downloadSuccessModal.totalRows} data riil telah dibuat ke file Excel</p>
+                <p className="text-xs text-surface-400 mt-0.5">{downloadSuccessModal.totalRows} data riil telah disatukan dalam lembar laporan</p>
               </div>
+              <button 
+                onClick={() => setDownloadSuccessModal({ ...downloadSuccessModal, open: false })}
+                className="p-1.5 rounded-lg text-surface-400 hover:text-white hover:bg-surface-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-surface-950/80 border border-surface-800 space-y-1.5">
-              <p className="text-[11px] font-bold uppercase text-surface-400 tracking-wider">Nama File:</p>
+            <div className="p-3.5 rounded-xl bg-surface-950/80 border border-surface-800 space-y-1">
+              <p className="text-[11px] font-bold uppercase text-surface-400 tracking-wider">Nama File Excel:</p>
               <p className="text-xs font-mono font-semibold text-emerald-400 break-all">
                 {downloadSuccessModal.fileName}
               </p>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-surface-900/90 border border-surface-800 space-y-2 text-xs text-surface-300">
-              <div className="flex items-center gap-2 font-bold text-amber-400">
-                <FolderDown className="w-4 h-4" />
-                <span>Dimana Membuka File di HP Android?</span>
+            {/* Pratinjau Rekap Ceklis yang Masuk ke File */}
+            {downloadSuccessModal.records && downloadSuccessModal.records.length > 0 && (
+              <div className="p-3 rounded-xl bg-surface-900/90 border border-surface-800 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-surface-300">Ringkasan Data dalam File:</span>
+                  <span className="text-[11px] text-emerald-400 font-bold">{downloadSuccessModal.records.length} Kendaraan</span>
+                </div>
+                <div className="max-h-36 overflow-y-auto divide-y divide-surface-800/60 rounded-lg bg-surface-950/50 p-2 scrollbar-thin">
+                  {downloadSuccessModal.records.map((r: any, idx: number) => (
+                    <div key={r.id || idx} className="py-1.5 flex items-center justify-between text-xs">
+                      <div>
+                        <div className="font-mono font-bold text-white">{r.nopol}</div>
+                        <div className="text-[10px] text-surface-400">{r.driver_name || r.technician_name || "Teknisi"}</div>
+                      </div>
+                      <div className="text-right">
+                        <span className={cn(
+                          "px-2 py-0.5 rounded-full text-[10px] font-semibold",
+                          r.status === "Baik / Laik Jalan" ? "bg-emerald-500/15 text-emerald-400" : "bg-amber-500/15 text-amber-400"
+                        )}>
+                          {r.status || "Baik"}
+                        </span>
+                        <div className="text-[10px] text-surface-400 mt-0.5">{r.date ? format(new Date(r.date), "dd MMM yyyy") : "-"}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <ol className="list-decimal list-inside space-y-1.5 text-surface-300 text-[11px] leading-relaxed">
-                <li>
-                  Klik tombol <strong>"Buka / Bagikan File"</strong> di bawah untuk langsung membuka file dengan <strong>Excel</strong>, <strong>WPS Office</strong>, atau <strong>Google Sheets</strong> di HP Anda.
-                </li>
-                <li>
-                  Atau buka aplikasi <strong>Pengelola File / File Saya / Files</strong> di HP Anda, lalu masuk ke folder <strong>Download (Unduhan)</strong>. File otomatis tersimpan di sana.
-                </li>
-              </ol>
-            </div>
+            )}
 
-            <div className="flex flex-col gap-2 pt-2">
+            {/* Panduan & Tombol Aksi */}
+            <div className="space-y-2 pt-1">
               <button
                 type="button"
                 onClick={handleShareFileAgain}
-                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-2"
+                className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2"
               >
                 <Share2 className="w-4 h-4" />
-                Buka / Bagikan File Langsung di HP
+                Buka / Bagikan File (Excel, WA, WPS)
               </button>
+
+              <a
+                href={downloadSuccessModal.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-2.5 rounded-xl bg-surface-900 hover:bg-surface-800 text-surface-200 text-xs font-semibold border border-surface-700 transition-colors flex items-center justify-center gap-2"
+              >
+                <ExternalLink className="w-4 h-4 text-emerald-400" />
+                Unduh Resmi ke Folder Download HP (Browser Luar)
+              </a>
 
               <button
                 type="button"
