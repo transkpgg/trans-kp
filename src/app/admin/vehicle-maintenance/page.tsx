@@ -27,7 +27,9 @@ import {
   MapPin,
   Share2,
   FolderDown,
-  ExternalLink
+  ExternalLink,
+  MessageCircle,
+  FileText
 } from "lucide-react";
 import useSWR from "swr";
 import { toast } from "sonner";
@@ -67,11 +69,12 @@ export default function AdminVehicleMaintenancePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  // Export Modal & Android Download States
+  // Export Modal, View Report & Android Download States
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState<"penumpang" | "lengkap">("penumpang");
   const [exportScope, setExportScope] = useState<"filtered" | "all">("filtered");
   const [isExporting, setIsExporting] = useState(false);
+  const [viewReportModalOpen, setViewReportModalOpen] = useState(false);
   const [downloadSuccessModal, setDownloadSuccessModal] = useState<{
     open: boolean;
     fileName: string;
@@ -134,6 +137,86 @@ export default function AdminVehicleMaintenancePage() {
   const targetExportList = useMemo(() => {
     return exportScope === "all" ? checklists : filteredChecklists;
   }, [exportScope, checklists, filteredChecklists]);
+
+  // Status Aktif Filter Tanggal Presisi
+  const isTodaySelected = useMemo(() => {
+    const today = format(new Date(), "yyyy-MM-dd");
+    return dateRange.start === today && dateRange.end === today;
+  }, [dateRange]);
+
+  const isLast7DaysSelected = useMemo(() => {
+    const end = format(new Date(), "yyyy-MM-dd");
+    const startObj = new Date();
+    startObj.setDate(startObj.getDate() - 6);
+    const start = format(startObj, "yyyy-MM-dd");
+    return dateRange.start === start && dateRange.end === end;
+  }, [dateRange]);
+
+  const isMonthSelected = useMemo(() => {
+    const today = new Date();
+    const startMonth = format(new Date(today.getFullYear(), today.getMonth(), 1), "yyyy-MM-dd");
+    const endMonth = format(new Date(today.getFullYear(), today.getMonth() + 1, 0), "yyyy-MM-dd");
+    return dateRange.start === startMonth && dateRange.end === endMonth;
+  }, [dateRange]);
+
+  const isAllDatesSelected = !dateRange.start && !dateRange.end;
+
+  // Bagikan Ringkasan Laporan ke WhatsApp (Berjalan mulus di Android APK)
+  const handleShareWhatsApp = (customList?: any[]) => {
+    const list = customList || targetExportList;
+    if (!list || list.length === 0) {
+      toast.error("Tidak ada data untuk dibagikan ke WhatsApp");
+      return;
+    }
+    let text = `*LAPORAN CEKLIST FISIK KENDARAAN*\n`;
+    text += `*PT. GUDANG GARAM TBK. KEDIRI*\n`;
+    text += `Tanggal: ${format(new Date(), "dd MMMM yyyy", { locale: id })}\n`;
+    text += `Jumlah Armada: ${list.length} Kendaraan\n`;
+    text += `------------------------------------\n\n`;
+    list.forEach((item, idx) => {
+      text += `${idx + 1}. *${item.nopol}*\n`;
+      text += `   • Status: ${item.status || "Baik / Laik Jalan"}\n`;
+      text += `   • Pengemudi: ${item.driver_name || "-"}\n`;
+      text += `   • Teknisi: ${item.technician_name || "-"}\n`;
+      text += `   • KM: ${item.km_berangkat || "-"} | BBM: ${item.bbm_awal || "-"}\n`;
+      if (item.notes) text += `   • Catatan: ${item.notes}\n`;
+      text += `\n`;
+    });
+    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+    window.open(waUrl, "_blank");
+  };
+
+  // Unduh File Excel Langsung via SheetJS (Sisi Klien)
+  const handleClientExcelDownload = () => {
+    try {
+      const rows = targetExportList.map((c, idx) => ({
+        "No": idx + 1,
+        "No Polisi": c.nopol,
+        "Tanggal": c.date ? format(new Date(c.date), "dd/MM/yyyy") : "-",
+        "Jam": c.time || "-",
+        "Pengemudi": c.driver_name || "-",
+        "Teknisi": c.technician_name || "-",
+        "KM Berangkat": c.km_berangkat || "-",
+        "BBM Awal": c.bbm_awal || "-",
+        "Kondisi Mesin": c.items?.engine_oil ? "Baik" : "Perlu Cek",
+        "Air Radiator": c.items?.radiator_water ? "Baik" : "Perlu Cek",
+        "Aki": c.items?.battery ? "Baik" : "Perlu Cek",
+        "Kondisi Rem": c.items?.brakes ? "Baik" : "Perlu Cek",
+        "Kondisi Ban": c.items?.tires ? "Baik" : "Perlu Cek",
+        "AC": c.items?.ac ? "Baik" : "Perlu Cek",
+        "Status": c.status || "Baik / Laik Jalan",
+        "Catatan": c.notes || "-",
+      }));
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Laporan Ceklis");
+      const fileName = `Laporan_Ceklis_Kendaraan_${format(new Date(), "yyyyMMdd_HHmm")}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      toast.success("File Excel berhasil diunduh!");
+    } catch (err) {
+      toast.error("Gagal mengunduh file Excel secara lokal.");
+    }
+  };
 
   // Export ke Excel Menggunakan Endpoint Resmi Server Tanpa Menavigasi WebView
   const executeExport = async (formatType: "penumpang" | "lengkap") => {
@@ -406,6 +489,15 @@ export default function AdminVehicleMaintenancePage() {
           </label>
 
           <button
+            onClick={() => setViewReportModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold shadow-md shadow-brand-600/20 transition-all"
+            title="Buka Dokumen Laporan di Layar HP"
+          >
+            <Eye className="w-3.5 h-3.5" />
+            Buka Laporan
+          </button>
+
+          <button
             onClick={() => setExportModalOpen(true)}
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all"
           >
@@ -553,19 +645,37 @@ export default function AdminVehicleMaintenancePage() {
               )}
             </div>
 
-            {/* Date Range Container */}
-            <div className="bg-surface-900/90 border border-surface-700/80 rounded-2xl p-2.5 sm:p-3 flex flex-col sm:flex-row sm:items-center gap-2.5 shadow-sm">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-surface-300">
-                  <Calendar className="w-3.5 h-3.5 text-brand-400" />
-                  <span className="uppercase text-[11px] tracking-wider text-surface-400">Periode</span>
+            {/* Filter Tanggal Presisi: Desain Simetris & Responsif Mobile */}
+            <div className="bg-surface-900/90 border border-surface-700/80 rounded-2xl p-3 sm:p-3.5 space-y-2.5 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-brand-500/15 border border-brand-500/30 flex items-center justify-center text-brand-400">
+                    <Calendar className="w-3.5 h-3.5" />
+                  </div>
+                  <span className="text-xs font-bold text-white tracking-wide">
+                    Filter Tanggal
+                  </span>
                   {(dateRange.start || dateRange.end) && (
-                    <span className="w-2 h-2 rounded-full bg-brand-400 inline-block animate-pulse" />
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-brand-500/20 text-brand-400 border border-brand-500/30 animate-pulse">
+                      Tersaring
+                    </span>
                   )}
                 </div>
 
-                {/* Quick Presets */}
-                <div className="flex items-center gap-1.5">
+                {/* Tombol Preset Presisi (Grid 4 kolom di mobile, sejajar di desktop) */}
+                <div className="grid grid-cols-4 sm:flex items-center gap-1.5 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => setDateRange({ start: "", end: "" })}
+                    className={cn(
+                      "h-8 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center text-center",
+                      isAllDatesSelected
+                        ? "bg-brand-500 text-white shadow-md shadow-brand-500/25 ring-1 ring-brand-400"
+                        : "bg-surface-800 text-surface-400 hover:text-white hover:bg-surface-750"
+                    )}
+                  >
+                    Semua
+                  </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -573,13 +683,31 @@ export default function AdminVehicleMaintenancePage() {
                       setDateRange({ start: today, end: today });
                     }}
                     className={cn(
-                      "px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-semibold transition-all shrink-0",
-                      dateRange.start === format(new Date(), "yyyy-MM-dd") && dateRange.end === format(new Date(), "yyyy-MM-dd")
-                        ? "bg-brand-500 text-white shadow-sm"
-                        : "bg-surface-800 text-surface-300 hover:text-white hover:bg-surface-700"
+                      "h-8 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center text-center",
+                      isTodaySelected
+                        ? "bg-brand-500 text-white shadow-md shadow-brand-500/25 ring-1 ring-brand-400"
+                        : "bg-surface-800 text-surface-400 hover:text-white hover:bg-surface-750"
                     )}
                   >
                     Hari Ini
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const end = format(new Date(), "yyyy-MM-dd");
+                      const startObj = new Date();
+                      startObj.setDate(startObj.getDate() - 6);
+                      const start = format(startObj, "yyyy-MM-dd");
+                      setDateRange({ start, end });
+                    }}
+                    className={cn(
+                      "h-8 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center text-center",
+                      isLast7DaysSelected
+                        ? "bg-brand-500 text-white shadow-md shadow-brand-500/25 ring-1 ring-brand-400"
+                        : "bg-surface-800 text-surface-400 hover:text-white hover:bg-surface-750"
+                    )}
+                  >
+                    7 Hari
                   </button>
                   <button
                     type="button"
@@ -589,54 +717,54 @@ export default function AdminVehicleMaintenancePage() {
                       const endMonth = format(new Date(today.getFullYear(), today.getMonth() + 1, 0), "yyyy-MM-dd");
                       setDateRange({ start: startMonth, end: endMonth });
                     }}
-                    className="px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-semibold bg-surface-800 text-surface-300 hover:text-white hover:bg-surface-700 transition-all shrink-0"
+                    className={cn(
+                      "h-8 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center text-center",
+                      isMonthSelected
+                        ? "bg-brand-500 text-white shadow-md shadow-brand-500/25 ring-1 ring-brand-400"
+                        : "bg-surface-800 text-surface-400 hover:text-white hover:bg-surface-750"
+                    )}
                   >
                     Bulan Ini
                   </button>
+                </div>
+              </div>
+
+              {/* Input Tanggal: Simetris, Rapi, & Presisi */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-surface-800/80">
+                <div className="flex items-center bg-surface-950 border border-surface-700/80 rounded-xl h-10 px-3 focus-within:border-brand-500 transition-colors">
+                  <span className="text-[11px] font-bold text-surface-400 uppercase w-14 shrink-0">
+                    Dari:
+                  </span>
+                  <input
+                    type="date"
+                    value={dateRange.start}
+                    onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+                    className="w-full bg-transparent text-white text-xs font-mono focus:outline-none [color-scheme:dark]"
+                    title="Pilih tanggal mulai"
+                  />
+                </div>
+
+                <div className="flex items-center bg-surface-950 border border-surface-700/80 rounded-xl h-10 px-3 focus-within:border-brand-500 transition-colors">
+                  <span className="text-[11px] font-bold text-surface-400 uppercase w-14 shrink-0">
+                    Sampai:
+                  </span>
+                  <input
+                    type="date"
+                    value={dateRange.end}
+                    onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+                    className="w-full bg-transparent text-white text-xs font-mono focus:outline-none [color-scheme:dark]"
+                    title="Pilih tanggal akhir"
+                  />
                   {(dateRange.start || dateRange.end) && (
                     <button
                       type="button"
                       onClick={() => setDateRange({ start: "", end: "" })}
-                      className="px-2 py-1 rounded-lg text-[10px] sm:text-[11px] font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-all flex items-center gap-1 shrink-0"
-                      title="Reset Periode"
+                      className="p-1 rounded-lg text-surface-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors shrink-0 ml-1.5"
+                      title="Reset rentang tanggal"
                     >
-                      <X className="w-3 h-3" />
-                      <span>Reset</span>
+                      <X className="w-3.5 h-3.5" />
                     </button>
                   )}
-                </div>
-              </div>
-
-              {/* Date Inputs Grid (Mobile: 2 Columns, Desktop: Inline Flex) */}
-              <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
-                <div className="relative flex-1 min-w-0">
-                  <div className="flex items-center bg-surface-950 border border-surface-700 rounded-xl px-2.5 py-1.5 focus-within:border-brand-500 transition-colors">
-                    <span className="text-[10px] font-bold text-surface-500 uppercase mr-1.5 shrink-0">
-                      Dari
-                    </span>
-                    <input
-                      type="date"
-                      value={dateRange.start}
-                      onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-                      className="w-full bg-transparent text-white text-xs font-mono focus:outline-none [color-scheme:dark]"
-                      title="Dari Tanggal"
-                    />
-                  </div>
-                </div>
-
-                <div className="relative flex-1 min-w-0">
-                  <div className="flex items-center bg-surface-950 border border-surface-700 rounded-xl px-2.5 py-1.5 focus-within:border-brand-500 transition-colors">
-                    <span className="text-[10px] font-bold text-surface-500 uppercase mr-1.5 shrink-0">
-                      S/d
-                    </span>
-                    <input
-                      type="date"
-                      value={dateRange.end}
-                      onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-                      className="w-full bg-transparent text-white text-xs font-mono focus:outline-none [color-scheme:dark]"
-                      title="Sampai Tanggal"
-                    />
-                  </div>
                 </div>
               </div>
             </div>
@@ -825,7 +953,7 @@ export default function AdminVehicleMaintenancePage() {
           onClick={() => setExportModalOpen(false)}
         >
           <div 
-            className="glass-card max-w-lg w-full p-6 rounded-2xl border border-emerald-500/30 space-y-5 shadow-2xl"
+            className="glass-card max-w-lg w-full p-6 rounded-2xl border border-emerald-500/30 space-y-5 shadow-2xl max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-surface-800 pb-3">
@@ -1068,34 +1196,247 @@ export default function AdminVehicleMaintenancePage() {
               </div>
             )}
 
-            {/* Panduan & Tombol Aksi */}
+            {/* Tombol Aksi di Android & Web */}
             <div className="space-y-2 pt-1">
               <button
                 type="button"
-                onClick={handleShareFileAgain}
-                className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2"
+                onClick={() => {
+                  setDownloadSuccessModal({ ...downloadSuccessModal, open: false });
+                  setViewReportModalOpen(true);
+                }}
+                className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold shadow-lg shadow-brand-600/30 transition-all flex items-center justify-center gap-2"
               >
-                <Share2 className="w-4 h-4" />
-                Buka / Bagikan File (Excel, WA, WPS)
+                <Eye className="w-4 h-4" />
+                Buka & Tampilkan Laporan di Layar HP
               </button>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleShareWhatsApp(downloadSuccessModal.records)}
+                  className="py-2.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
+                >
+                  <MessageCircle className="w-4 h-4 text-emerald-400" />
+                  Kirim ke WhatsApp
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleClientExcelDownload}
+                  className="py-2.5 rounded-xl bg-surface-900 hover:bg-surface-800 text-surface-200 border border-surface-700 text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
+                >
+                  <Download className="w-4 h-4 text-brand-400" />
+                  Simpan File Excel
+                </button>
+              </div>
 
               <a
                 href={downloadSuccessModal.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full py-2.5 rounded-xl bg-surface-900 hover:bg-surface-800 text-surface-200 text-xs font-semibold border border-surface-700 transition-colors flex items-center justify-center gap-2"
+                className="w-full py-2 rounded-xl bg-surface-950 hover:bg-surface-900 text-surface-400 hover:text-white text-[11px] font-medium border border-surface-800 transition-colors flex items-center justify-center gap-1.5"
               >
-                <ExternalLink className="w-4 h-4 text-emerald-400" />
-                Unduh Resmi ke Folder Download HP (Browser Luar)
+                <ExternalLink className="w-3.5 h-3.5 text-surface-400" />
+                Unduh Resmi via Browser Luar (Chrome)
               </a>
 
               <button
                 type="button"
                 onClick={() => setDownloadSuccessModal({ ...downloadSuccessModal, open: false })}
-                className="w-full py-2 rounded-xl bg-surface-800 hover:bg-surface-700 text-surface-300 text-xs font-semibold transition-colors"
+                className="w-full py-2 rounded-xl bg-surface-800 hover:bg-surface-750 text-surface-400 hover:text-white text-xs font-semibold transition-colors"
               >
                 Tutup
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Buka & Tampilkan Laporan Dokumen Lengkap di Layar HP */}
+      {viewReportModalOpen && (
+        <div 
+          className="fixed inset-0 z-[130] flex items-center justify-center p-2 sm:p-4 bg-black/90 backdrop-blur-md animate-in fade-in"
+          onClick={() => setViewReportModalOpen(false)}
+        >
+          <div 
+            className="glass-card max-w-5xl w-full rounded-2xl border border-brand-500/30 bg-surface-950 flex flex-col max-h-[94vh] shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header Modal Dokumen */}
+            <div className="p-4 border-b border-surface-800 flex items-center justify-between bg-surface-900/90 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-brand-500/15 border border-brand-500/30 flex items-center justify-center text-brand-400">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-white">
+                    Lembar Laporan Ceklis Kendaraan
+                  </h3>
+                  <p className="text-[11px] text-surface-400">
+                    PT. Gudang Garam Tbk. Kediri • {targetExportList.length} Kendaraan Tersaring
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-800 hover:bg-surface-700 text-surface-200 text-xs font-semibold border border-surface-700"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  Cetak
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleShareWhatsApp(targetExportList)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  Bagikan WA
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewReportModalOpen(false)}
+                  className="p-1.5 rounded-lg text-surface-400 hover:text-white hover:bg-surface-800"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Isi Tabel Dokumen Laporan */}
+            <div className="flex-1 overflow-auto p-3 sm:p-5 space-y-4">
+              {/* Header Dokumen Formal */}
+              <div className="p-4 rounded-xl bg-surface-900/60 border border-surface-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                <div>
+                  <h4 className="font-extrabold text-white uppercase text-sm sm:text-base tracking-wide">
+                    LAPORAN CHEK LIST KONDISI KENDARAAN PENUMPANG
+                  </h4>
+                  <p className="text-surface-400 text-xs mt-0.5">
+                    Periode: {dateRange.start ? format(new Date(dateRange.start), "dd MMM yyyy") : "Awal"} s/d {dateRange.end ? format(new Date(dateRange.end), "dd MMM yyyy") : "Hari Ini"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold">
+                    Laik: {targetExportList.filter(c => c.status === "Baik / Laik Jalan").length}
+                  </span>
+                  <span className="px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 font-bold">
+                    Perbaikan: {targetExportList.filter(c => c.status !== "Baik / Laik Jalan").length}
+                  </span>
+                </div>
+              </div>
+
+              {/* Tabel Data Ceklis Lengkap */}
+              <div className="rounded-xl border border-surface-800 overflow-x-auto shadow-inner bg-surface-950/70">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-surface-800 bg-surface-900 text-surface-300 text-[11px] uppercase tracking-wider font-bold">
+                      <th className="py-2.5 px-3 text-center w-10">No</th>
+                      <th className="py-2.5 px-3">No Polisi</th>
+                      <th className="py-2.5 px-3">Tanggal & Jam</th>
+                      <th className="py-2.5 px-3">Pengemudi</th>
+                      <th className="py-2.5 px-3">Teknisi</th>
+                      <th className="py-2.5 px-3">KM / BBM</th>
+                      <th className="py-2.5 px-3 text-center">Oli</th>
+                      <th className="py-2.5 px-3 text-center">Radiator</th>
+                      <th className="py-2.5 px-3 text-center">Rem</th>
+                      <th className="py-2.5 px-3 text-center">Ban</th>
+                      <th className="py-2.5 px-3 text-center">AC</th>
+                      <th className="py-2.5 px-3">Status</th>
+                      <th className="py-2.5 px-3">Catatan</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-surface-800/60 font-sans">
+                    {targetExportList.length === 0 ? (
+                      <tr>
+                        <td colSpan={13} className="py-8 text-center text-surface-500 text-xs">
+                          Tidak ada data ceklis kendaraan untuk periode ini.
+                        </td>
+                      </tr>
+                    ) : (
+                      targetExportList.map((item, idx) => (
+                        <tr key={item.id || idx} className="hover:bg-surface-900/40 transition-colors">
+                          <td className="py-2.5 px-3 text-center font-mono text-surface-400 font-bold">{idx + 1}</td>
+                          <td className="py-2.5 px-3 font-mono font-bold text-white whitespace-nowrap">{item.nopol}</td>
+                          <td className="py-2.5 px-3 whitespace-nowrap text-surface-300">
+                            <div>{item.date ? format(new Date(item.date), "dd/MM/yyyy") : "-"}</div>
+                            <div className="text-[10px] text-surface-500">{item.time || "-"} WIB</div>
+                          </td>
+                          <td className="py-2.5 px-3 font-medium text-white whitespace-nowrap">{item.driver_name || "-"}</td>
+                          <td className="py-2.5 px-3 text-surface-300 whitespace-nowrap">{item.technician_name || "-"}</td>
+                          <td className="py-2.5 px-3 whitespace-nowrap text-surface-300">
+                            <div>KM: {item.km_berangkat || "-"}</div>
+                            <div className="text-[10px] text-surface-500">BBM: {item.bbm_awal || "-"}</div>
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded", item.items?.engine_oil ? "text-emerald-400 bg-emerald-500/10" : "text-amber-400 bg-amber-500/10")}>
+                              {item.items?.engine_oil ? "OK" : "NO"}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded", item.items?.radiator_water ? "text-emerald-400 bg-emerald-500/10" : "text-amber-400 bg-amber-500/10")}>
+                              {item.items?.radiator_water ? "OK" : "NO"}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded", item.items?.brakes ? "text-emerald-400 bg-emerald-500/10" : "text-amber-400 bg-amber-500/10")}>
+                              {item.items?.brakes ? "OK" : "NO"}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded", item.items?.tires ? "text-emerald-400 bg-emerald-500/10" : "text-amber-400 bg-amber-500/10")}>
+                              {item.items?.tires ? "OK" : "NO"}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded", item.items?.ac ? "text-emerald-400 bg-emerald-500/10" : "text-amber-400 bg-amber-500/10")}>
+                              {item.items?.ac ? "OK" : "NO"}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 whitespace-nowrap">
+                            <span className={cn(
+                              "px-2 py-0.5 rounded-full text-[10px] font-bold",
+                              item.status === "Baik / Laik Jalan"
+                                ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                                : "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                            )}>
+                              {item.status || "Baik"}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-surface-400 text-[11px] max-w-[180px] truncate" title={item.notes || "-"}>
+                            {item.notes || "-"}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Footer Modal Dokumen */}
+            <div className="p-3.5 border-t border-surface-800 bg-surface-900/90 flex flex-wrap items-center justify-between gap-2 shrink-0">
+              <div className="text-xs text-surface-400">
+                Menampilkan <strong className="text-white">{targetExportList.length}</strong> armada kendaraan
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleClientExcelDownload}
+                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all flex items-center gap-1.5"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Ekspor Excel (.xlsx)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewReportModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-surface-800 hover:bg-surface-700 text-surface-300 text-xs font-semibold transition-colors"
+                >
+                  Tutup
+                </button>
+              </div>
             </div>
           </div>
         </div>
