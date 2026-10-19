@@ -29,7 +29,8 @@ import {
   FolderDown,
   ExternalLink,
   MessageCircle,
-  FileText
+  FileText,
+  Copy
 } from "lucide-react";
 import useSWR from "swr";
 import { toast } from "sonner";
@@ -182,6 +183,10 @@ export default function AdminVehicleMaintenancePage() {
       if (item.notes) text += `   • Catatan: ${item.notes}\n`;
       text += `\n`;
     });
+    if (downloadSuccessModal.url) {
+      text += `------------------------------------\n`;
+      text += `📥 *Link Unduh File Excel Langsung*:\n${downloadSuccessModal.url}\n`;
+    }
     const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
     window.open(waUrl, "_blank");
   };
@@ -234,32 +239,30 @@ export default function AdminVehicleMaintenancePage() {
     setIsExporting(true);
 
     try {
-      // 1. Ambil data binary blob langsung di memori (tidak menavigasi webview agar halaman tidak blank di HP)
+      // 1. Dapatkan token otentikasi unduhan aman untuk browser / Download Manager HP Android
+      let token = "";
+      try {
+        const tokenRes = await fetch("/api/vehicle-checklists/export", { method: "POST" });
+        if (tokenRes.ok) {
+          const tokenData = await tokenRes.json();
+          token = tokenData.token || "";
+        }
+      } catch (_) {}
+
+      const exportUrlWithToken = token ? `${exportUrl}&token=${token}` : exportUrl;
+      const fullPublicDownloadUrl = typeof window !== "undefined"
+        ? `${window.location.origin}${exportUrlWithToken}`
+        : exportUrlWithToken;
+
+      // 2. Ambil data binary blob langsung dari server
       const res = await fetch(exportUrl);
       if (!res.ok) {
         throw new Error("Gagal mengambil data dari server");
       }
       const blob = await res.blob();
 
-      // 2. Tutup modal opsi dan BUKA modal hasil ekspor (Pop-up Hasil Ekspor)
-      setExportModalOpen(false);
-      setDownloadSuccessModal({
-        open: true,
-        fileName,
-        blob,
-        url: exportUrl,
-        totalRows: targetExportList.length,
-        records: targetExportList,
-      });
-
-      // 3. Jika pengguna membuka dari browser PC/Desktop, otomatis unduh via blob
-      const isMobileDevice = typeof window !== "undefined" && (
-        !!(window as any).isFlutterApp ||
-        !!(window as any).FlutterNFCChannel ||
-        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-      );
-
-      if (!isMobileDevice) {
+      // 3. Pemicu Unduh Otomatis File Excel (Berjalan di Browser Web & Android Chrome)
+      try {
         const blobUrl = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = blobUrl;
@@ -269,8 +272,19 @@ export default function AdminVehicleMaintenancePage() {
         setTimeout(() => {
           document.body.removeChild(a);
           window.URL.revokeObjectURL(blobUrl);
-        }, 1500);
-      }
+        }, 2000);
+      } catch (_) {}
+
+      // 4. Tutup modal opsi dan BUKA modal hasil ekspor (Pop-up Hasil Ekspor)
+      setExportModalOpen(false);
+      setDownloadSuccessModal({
+        open: true,
+        fileName,
+        blob,
+        url: fullPublicDownloadUrl,
+        totalRows: targetExportList.length,
+        records: targetExportList,
+      });
 
       toast.success(`Laporan siap! (${targetExportList.length} data riil)`);
     } catch (e: any) {
@@ -1196,49 +1210,67 @@ export default function AdminVehicleMaintenancePage() {
               </div>
             )}
 
+            {/* Panduan Lokasi File di HP Android */}
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 leading-relaxed space-y-1">
+              <p className="font-bold flex items-center gap-1.5 text-amber-400">
+                <FolderDown className="w-4 h-4 shrink-0" />
+                Lokasi File di HP Android:
+              </p>
+              <p>
+                File disimpan di: <strong>Penyimpanan Internal &gt; Download</strong>.
+                Buka aplikasi <strong>Pengelola File / File Saya</strong> di HP Anda untuk menemukan file <strong>{downloadSuccessModal.fileName}</strong>.
+              </p>
+            </div>
+
             {/* Tombol Aksi di Android & Web */}
             <div className="space-y-2 pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setDownloadSuccessModal({ ...downloadSuccessModal, open: false });
-                  setViewReportModalOpen(true);
-                }}
-                className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold shadow-lg shadow-brand-600/30 transition-all flex items-center justify-center gap-2"
+              {/* Tombol Utama Android: Unduh ke Folder Download Resmi HP via Chrome */}
+              <a
+                href={downloadSuccessModal.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2 text-center"
               >
-                <Eye className="w-4 h-4" />
-                Buka & Tampilkan Laporan di Layar HP
-              </button>
+                <Download className="w-4 h-4" />
+                Unduh File ke Folder Download HP (Browser Luar / Chrome)
+              </a>
 
               <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDownloadSuccessModal({ ...downloadSuccessModal, open: false });
+                    setViewReportModalOpen(true);
+                  }}
+                  className="py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold shadow-md shadow-brand-600/25 transition-all flex items-center justify-center gap-1.5"
+                >
+                  <Eye className="w-4 h-4" />
+                  Buka di Layar
+                </button>
+
                 <button
                   type="button"
                   onClick={() => handleShareWhatsApp(downloadSuccessModal.records)}
                   className="py-2.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
                 >
                   <MessageCircle className="w-4 h-4 text-emerald-400" />
-                  Kirim ke WhatsApp
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleClientExcelDownload}
-                  className="py-2.5 rounded-xl bg-surface-900 hover:bg-surface-800 text-surface-200 border border-surface-700 text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
-                >
-                  <Download className="w-4 h-4 text-brand-400" />
-                  Simpan File Excel
+                  Kirim ke WA
                 </button>
               </div>
 
-              <a
-                href={downloadSuccessModal.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full py-2 rounded-xl bg-surface-950 hover:bg-surface-900 text-surface-400 hover:text-white text-[11px] font-medium border border-surface-800 transition-colors flex items-center justify-center gap-1.5"
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof navigator !== "undefined" && navigator.clipboard) {
+                    navigator.clipboard.writeText(downloadSuccessModal.url);
+                    toast.success("Link unduhan file berhasil disalin ke clipboard!");
+                  }
+                }}
+                className="w-full py-2 rounded-xl bg-surface-900 hover:bg-surface-800 text-surface-300 border border-surface-700 text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
               >
-                <ExternalLink className="w-3.5 h-3.5 text-surface-400" />
-                Unduh Resmi via Browser Luar (Chrome)
-              </a>
+                <Copy className="w-3.5 h-3.5 text-brand-400" />
+                Salin Link Download File Excel
+              </button>
 
               <button
                 type="button"

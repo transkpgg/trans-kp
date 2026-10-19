@@ -10,9 +10,18 @@ const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'super-secret-key-trans-kp-2024'
 );
 
-async function getUserFromToken() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get('auth_token')?.value;
+async function getUserFromToken(request?: NextRequest) {
+  let token: string | undefined;
+  try {
+    const cookieStore = await cookies();
+    token = cookieStore.get('auth_token')?.value;
+  } catch (_) {}
+
+  // Jika cookie tidak terbaca (misal dibuka di browser luar / download manager), cek token di query params
+  if (!token && request) {
+    token = request.nextUrl.searchParams.get('token') || undefined;
+  }
+
   if (!token) return null;
   try {
     const { payload } = await jose.jwtVerify(token, JWT_SECRET);
@@ -34,9 +43,36 @@ async function getUserFromToken() {
   }
 }
 
+// POST: Terbitkan token unduhan aman (berlaku 2 jam) agar dapat diunduh langsung di HP Android via browser eksternal
+export async function POST(request: NextRequest) {
+  try {
+    const user = await getUserFromToken(request);
+    if (!user) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+
+    const isTeknisi = user.jabatan === 'Teknisi';
+    const isMaintenanceAdmin = user.jabatan === 'Admin Perawatan Kendaraan';
+    const isSuperAdmin = user.role === 'super_admin' || user.role === 'admin';
+
+    if (!isTeknisi && !isMaintenanceAdmin && !isSuperAdmin) {
+      return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+    }
+
+    const token = await new jose.SignJWT({ id: user.id })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setExpirationTime('2h')
+      .sign(JWT_SECRET);
+
+    return NextResponse.json({ token });
+  } catch (e: any) {
+    return NextResponse.json({ message: 'Server error' }, { status: 500 });
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
-    const user = await getUserFromToken();
+    const user = await getUserFromToken(request);
     if (!user) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
