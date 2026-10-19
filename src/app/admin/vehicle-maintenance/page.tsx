@@ -75,11 +75,13 @@ export default function AdminVehicleMaintenancePage() {
     open: boolean;
     fileName: string;
     blob: Blob | null;
+    url: string;
     totalRows: number;
   }>({
     open: false,
     fileName: "",
     blob: null,
+    url: "",
     totalRows: 0,
   });
 
@@ -130,290 +132,22 @@ export default function AdminVehicleMaintenancePage() {
     return exportScope === "all" ? checklists : filteredChecklists;
   }, [exportScope, checklists, filteredChecklists]);
 
-  // Export ke Excel Sesuai Data Riil Yang Ada & Support Android Native Share/Open
+  // Export ke Excel Menggunakan Endpoint Resmi Server (Trigger Android Download Manager & Native Share)
   const executeExport = async (formatType: "penumpang" | "lengkap") => {
     if (targetExportList.length === 0) {
       toast.error("Tidak ada data ceklis untuk diekspor.");
       return;
     }
 
-    const wb = XLSX.utils.book_new();
-    let fileName = "";
+    const fileName = formatType === "penumpang"
+      ? `Laporan_Chek_List_Kendaraan_Penumpang_${format(new Date(), "yyyyMMdd_HHmm")}.xlsx`
+      : `Rekap_Lengkap_Ceklis_Kendaraan_${format(new Date(), "yyyyMMdd_HHmm")}.xlsx`;
 
-    // Urutkan semua data yang akan diekspor (tanggal terbaru dan jam terbaru)
-    const sortedAllItems = [...targetExportList].sort((a: any, b: any) => {
-      const dateA = a.date ? new Date(a.date).getTime() : 0;
-      const dateB = b.date ? new Date(b.date).getTime() : 0;
-      if (dateB !== dateA) return dateB - dateA;
-      return (b.inspection_time || "").localeCompare(a.inspection_time || "");
-    });
+    const exportUrl = `/api/vehicle-checklists/export?format=${formatType}&scope=${exportScope}&startDate=${dateRange.start}&endDate=${dateRange.end}&status=${statusFilter}&search=${encodeURIComponent(search)}`;
 
-    if (formatType === "penumpang") {
-      // 1. FORMAT RESMI: LAPORAN CHEK LIST KENDARAAN PENUMPANG (SESUAI CONTOH FOTO)
-      // Grouping data berdasarkan tanggal inspeksi
-      const groupedByDate: Record<string, any[]> = {};
-      sortedAllItems.forEach((item: any) => {
-        const dStr = item.date ? format(new Date(item.date), "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd");
-        if (!groupedByDate[dStr]) {
-          groupedByDate[dStr] = [];
-        }
-        groupedByDate[dStr].push(item);
-      });
-
-      const dateKeys = Object.keys(groupedByDate).sort().reverse();
-      const hasMultipleDates = dateKeys.length > 1;
-
-      // SHEET UTAMA: WAJIB MENAMPILKAN SEMUA DATA SEKALIGUS (JIKA ADA 2 CEKLIS, KEDUANYA TAMPIL DI SINI)
-      const mainRows: any[][] = sortedAllItems.map((c: any, index: number) => {
-        const vMatch = vehicles.find((v: any) =>
-          v.nopol?.replace(/\s+/g, "").toUpperCase() === (c.nopol || "").replace(/\s+/g, "").toUpperCase()
-        );
-        const jenisKend = vMatch?.type || vMatch?.name || "Mini Bus";
-
-        let formattedKm = c.kilometer || "-";
-        const cleanKm = Number(String(c.kilometer).replace(/[^0-9]/g, ""));
-        if (!isNaN(cleanKm) && cleanKm > 0) {
-          formattedKm = cleanKm.toLocaleString("en-US");
-        }
-
-        const formattedJam = (c.inspection_time || "-").replace(":", ".");
-        const formattedTgl = c.date ? format(new Date(c.date), "dd/MM/yyyy") : "-";
-        const tujuan = c.destination || "-";
-        const pengemudi = c.driver_name || c.technician_name || "-";
-        const keterangan = c.status === "Baik / Laik Jalan" ? "Siap" : (c.general_notes || c.status || "-");
-
-        if (hasMultipleDates) {
-          return [
-            index + 1,
-            c.nopol || "-",
-            jenisKend,
-            formattedTgl,
-            formattedJam,
-            formattedKm,
-            pengemudi,
-            tujuan,
-            keterangan,
-          ];
-        } else {
-          return [
-            index + 1,
-            c.nopol || "-",
-            jenisKend,
-            formattedKm,
-            formattedJam,
-            pengemudi,
-            tujuan,
-            keterangan,
-          ];
-        }
-      });
-
-      let mainSubtitle = "";
-      if (dateKeys.length === 1) {
-        mainSubtitle = `TANGGAL ${format(new Date(dateKeys[0]), "d MMMM yyyy", { locale: id })}`;
-      } else if (dateKeys.length > 1) {
-        const newest = format(new Date(dateKeys[0]), "d MMM yyyy", { locale: id });
-        const oldest = format(new Date(dateKeys[dateKeys.length - 1]), "d MMM yyyy", { locale: id });
-        mainSubtitle = `PERIODE: ${oldest} s/d ${newest}`;
-      } else {
-        mainSubtitle = `TANGGAL ${format(new Date(), "d MMMM yyyy", { locale: id })}`;
-      }
-
-      const mainHeader = hasMultipleDates
-        ? ["No Urut", "No Pol", "Jenis Kend.", "Tanggal", "Jam", "KM", "Pengemudi", "Tujuan", "Keterangan"]
-        : ["No Urut", "No Pol", "Jenis Kend.", "KM", "Jam", "Pengemudi", "Tujuan", "Keterangan"];
-
-      const mainSheetData: any[][] = [
-        [],
-        [],
-        ["LAPORAN CHEK LIST KENDARAAN PENUMPANG"],
-        [mainSubtitle],
-        [],
-        mainHeader,
-        ...mainRows,
-      ];
-
-      const wsMain = XLSX.utils.aoa_to_sheet(mainSheetData);
-      const maxColIdx = mainHeader.length - 1;
-      wsMain["!merges"] = [
-        { s: { r: 2, c: 0 }, e: { r: 2, c: maxColIdx } },
-        { s: { r: 3, c: 0 }, e: { r: 3, c: maxColIdx } },
-      ];
-
-      if (hasMultipleDates) {
-        wsMain["!cols"] = [
-          { wch: 8 },
-          { wch: 15 },
-          { wch: 14 },
-          { wch: 13 },
-          { wch: 10 },
-          { wch: 14 },
-          { wch: 24 },
-          { wch: 18 },
-          { wch: 15 },
-        ];
-      } else {
-        wsMain["!cols"] = [
-          { wch: 8 },
-          { wch: 15 },
-          { wch: 14 },
-          { wch: 14 },
-          { wch: 10 },
-          { wch: 24 },
-          { wch: 18 },
-          { wch: 15 },
-        ];
-      }
-
-      const mainSheetName = hasMultipleDates ? "Semua Ceklis" : format(new Date(dateKeys[0]), "ddMMMyy", { locale: id });
-      XLSX.utils.book_append_sheet(wb, wsMain, mainSheetName);
-
-      // JIKA LEBIH DARI 1 TANGGAL: Tambahkan juga tab per tanggal untuk kemudahan arsip harian
-      if (hasMultipleDates) {
-        dateKeys.forEach((dateKey) => {
-          const items = groupedByDate[dateKey];
-          const dateObj = new Date(dateKey);
-          const tabName = format(dateObj, "ddMMMyy", { locale: id });
-          const singleDateTitle = format(dateObj, "d MMMM yyyy", { locale: id });
-
-          const dailyRows: any[][] = items.map((c: any, idx: number) => {
-            const vMatch = vehicles.find((v: any) =>
-              v.nopol?.replace(/\s+/g, "").toUpperCase() === (c.nopol || "").replace(/\s+/g, "").toUpperCase()
-            );
-            const jenisKend = vMatch?.type || vMatch?.name || "Mini Bus";
-
-            let formattedKm = c.kilometer || "-";
-            const cleanKm = Number(String(c.kilometer).replace(/[^0-9]/g, ""));
-            if (!isNaN(cleanKm) && cleanKm > 0) {
-              formattedKm = cleanKm.toLocaleString("en-US");
-            }
-
-            const formattedJam = (c.inspection_time || "-").replace(":", ".");
-            const tujuan = c.destination || "-";
-            const pengemudi = c.driver_name || c.technician_name || "-";
-            const keterangan = c.status === "Baik / Laik Jalan" ? "Siap" : (c.general_notes || c.status || "-");
-
-            return [
-              idx + 1,
-              c.nopol || "-",
-              jenisKend,
-              formattedKm,
-              formattedJam,
-              pengemudi,
-              tujuan,
-              keterangan,
-            ];
-          });
-
-          const dailySheetData: any[][] = [
-            [],
-            [],
-            ["LAPORAN CHEK LIST KENDARAAN PENUMPANG"],
-            [`TANGGAL ${singleDateTitle}`],
-            [],
-            ["No Urut", "No Pol", "Jenis Kend.", "KM", "Jam", "Pengemudi", "Tujuan", "Keterangan"],
-            ...dailyRows,
-          ];
-
-          const wsDaily = XLSX.utils.aoa_to_sheet(dailySheetData);
-          wsDaily["!merges"] = [
-            { s: { r: 2, c: 0 }, e: { r: 2, c: 7 } },
-            { s: { r: 3, c: 0 }, e: { r: 3, c: 7 } },
-          ];
-          wsDaily["!cols"] = [
-            { wch: 8 },
-            { wch: 15 },
-            { wch: 14 },
-            { wch: 14 },
-            { wch: 10 },
-            { wch: 24 },
-            { wch: 18 },
-            { wch: 15 },
-          ];
-
-          XLSX.utils.book_append_sheet(wb, wsDaily, tabName);
-        });
-      }
-
-      fileName = `Laporan_Chek_List_Kendaraan_Penumpang_${format(new Date(), "yyyyMMdd_HHmm")}.xlsx`;
-    } else {
-      // 2. FORMAT LENGKAP: SEMUA KOLOM SESUAI FORM CEKLIS LENGKAP
-      const exportData = sortedAllItems.map((c: any, index: number) => {
-        const vMatch = vehicles.find((v: any) =>
-          v.nopol?.replace(/\s+/g, "").toUpperCase() === (c.nopol || "").replace(/\s+/g, "").toUpperCase()
-        );
-        return {
-          "No": index + 1,
-          "No Ceklis": c.checklist_no || "-",
-          "Tanggal": format(new Date(c.date), "dd/MM/yyyy"),
-          "Jam": c.inspection_time || "-",
-          "Nomor Polisi": c.nopol,
-          "Jenis Kendaraan": vMatch?.type || vMatch?.name || "Mobil",
-          "Kilometer (KM)": c.kilometer,
-          "Indikator BBM": c.fuel_level,
-          "Tujuan Keberangkatan": c.destination || "-",
-          "Status Kelayakan": c.status,
-          "Nama Pengemudi": c.driver_name || "-",
-          "Teknisi Pemeriksa": c.technician_name || "-",
-          "Pengawas": c.supervisor_name || "-",
-          "Oli Mesin": c.engine_oil,
-          "Air Radiator": c.radiator_water,
-          "Accu / Air Accu": c.battery_water,
-          "Oli Powersteer": c.power_steering_oil,
-          "V. Belt": c.v_belt,
-          "Understell": c.understell,
-          "Indikator Dashboard": c.dashboard_indicator,
-          "Kondisi Mesin": c.engine_condition,
-          "Kunci Roda": c.wheel_wrench,
-          "Dongkrak": c.jack,
-          "Segitiga Pengaman": c.safety_triangle,
-          "Kotak P3K": c.first_aid_box,
-          "STNK / PKB": c.stnk_pkb,
-          "Ban Utama": c.main_tire_condition,
-          "Ban Serep": c.spare_tire_condition,
-          "Kondisi AC": c.ac_condition,
-          "Radio / Tape": c.radio_tape,
-          "Pemantik Rokok": c.cigarette_lighter,
-          "Lampu-Lampu": c.lights_condition,
-          "Catatan Lampu": c.lights_notes || "-",
-          "Kerja Rem": c.brake_operation,
-          "Minyak Rem": c.brake_fluid,
-          "Rem Tangan": c.hand_brake,
-          "Catatan Umum": c.general_notes || "-",
-        };
-      });
-
-      const ws = XLSX.utils.json_to_sheet(exportData);
-      XLSX.utils.book_append_sheet(wb, ws, "Rekap Data Ceklis Lengkap");
-      fileName = `Rekap_Lengkap_Ceklis_Kendaraan_${format(new Date(), "yyyyMMdd_HHmm")}.xlsx`;
-    }
-
-    // Generate binary blob dengan MIME Type Excel resmi
-    const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-    const blob = new Blob([wbout], {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    });
-    const file = new File([blob], fileName, {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    });
-
-    // 1. Coba Web Share API (Fitur Android untuk langsung memilih aplikasi pembuka: Excel, WPS, Sheets, Drive)
-    if (typeof navigator !== "undefined" && navigator.canShare && navigator.canShare({ files: [file] })) {
-      try {
-        await navigator.share({
-          files: [file],
-          title: fileName,
-          text: `Buka laporan hasil ekspor ${fileName}`,
-        });
-      } catch (err: any) {
-        // User dismiss share sheet
-      }
-    }
-
-    // 2. Download otomatis ke folder Download browser / Android
-    const downloadUrl = URL.createObjectURL(blob);
+    // 1. Trigger langsung ke sistem Android Download Manager via HTTP download
     const a = document.createElement("a");
-    a.href = downloadUrl;
+    a.href = exportUrl;
     a.download = fileName;
     document.body.appendChild(a);
     a.click();
@@ -423,41 +157,85 @@ export default function AdminVehicleMaintenancePage() {
 
     setExportModalOpen(false);
 
-    // 3. Tampilkan Modal Panduan Lokasi File di Android
-    setDownloadSuccessModal({
-      open: true,
-      fileName,
-      blob,
-      totalRows: targetExportList.length,
-    });
+    // 2. Fetch blob untuk mendukung tombol "Buka / Bagikan Langsung" di HP (Web Share API)
+    try {
+      const res = await fetch(exportUrl);
+      if (res.ok) {
+        const blob = await res.blob();
+        const file = new File([blob], fileName, {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+
+        // Jika HP mendukung Web Share API file, buka menu pilihan aplikasi Android (Excel, WPS, Sheets)
+        if (typeof navigator !== "undefined" && navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({
+              files: [file],
+              title: fileName,
+              text: `Buka laporan hasil ekspor ${fileName}`,
+            });
+          } catch (err: any) {
+            // User dismiss share sheet
+          }
+        }
+
+        setDownloadSuccessModal({
+          open: true,
+          fileName,
+          blob,
+          url: exportUrl,
+          totalRows: targetExportList.length,
+        });
+      } else {
+        setDownloadSuccessModal({
+          open: true,
+          fileName,
+          blob: null,
+          url: exportUrl,
+          totalRows: targetExportList.length,
+        });
+      }
+    } catch (e) {
+      setDownloadSuccessModal({
+        open: true,
+        fileName,
+        blob: null,
+        url: exportUrl,
+        totalRows: targetExportList.length,
+      });
+    }
 
     toast.success(`Berhasil mengekspor ${targetExportList.length} data riil!`);
   };
 
   const handleShareFileAgain = async () => {
-    if (!downloadSuccessModal.blob || !downloadSuccessModal.fileName) return;
-    const file = new File([downloadSuccessModal.blob], downloadSuccessModal.fileName, {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    });
-    if (typeof navigator !== "undefined" && navigator.canShare && navigator.canShare({ files: [file] })) {
-      try {
-        await navigator.share({
-          files: [file],
-          title: downloadSuccessModal.fileName,
-          text: `Buka hasil ekspor ${downloadSuccessModal.fileName}`,
-        });
-      } catch (e) {
-        // ignore
+    if (downloadSuccessModal.blob && downloadSuccessModal.fileName) {
+      const file = new File([downloadSuccessModal.blob], downloadSuccessModal.fileName, {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      if (typeof navigator !== "undefined" && navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: downloadSuccessModal.fileName,
+            text: `Buka hasil ekspor ${downloadSuccessModal.fileName}`,
+          });
+          return;
+        } catch (e) {
+          // ignore
+        }
       }
-    } else {
-      const url = URL.createObjectURL(downloadSuccessModal.blob);
+    }
+
+    // Fallback: Trigger direct download again
+    if (downloadSuccessModal.url) {
       const a = document.createElement("a");
-      a.href = url;
+      a.href = downloadSuccessModal.url;
       a.download = downloadSuccessModal.fileName;
       document.body.appendChild(a);
       a.click();
       setTimeout(() => document.body.removeChild(a), 2000);
-      toast.info("Mengunduh ulang file ke folder Download...");
+      toast.info("Mengunduh ulang file ke folder Download HP...");
     }
   };
 
